@@ -109,10 +109,9 @@ export class RiotClient {
     );
   }
 
-  /** Most recent match ids first. `startTime` is epoch seconds (exclusive lower bound per Riot docs). */
-  getMatchIds(regional: RegionalRoute, puuid: string, opts: { count: number; startTime?: number }) {
-    const params = new URLSearchParams({ start: '0', count: String(opts.count) });
-    if (opts.startTime !== undefined) params.set('startTime', String(opts.startTime));
+  /** Match ids, most recent first. Page through history with `start` (Riot allows `count` up to 200). */
+  getMatchIds(regional: RegionalRoute, puuid: string, opts: { start: number; count: number }) {
+    const params = new URLSearchParams({ start: String(opts.start), count: String(opts.count) });
     return this.get<string[]>(regional, `/tft/match/v1/matches/by-puuid/${puuid}/ids?${params}`);
   }
 

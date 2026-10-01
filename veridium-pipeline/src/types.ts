@@ -16,6 +16,7 @@ export interface Matchup {
   queueType: QueueType;
   placement: number;
   timestamp: string; // ISO 8601
+  set: number; // TFT set number; each set is a ranked season
 }
 
 export interface RankEntry {
@@ -56,7 +57,7 @@ export interface TftMatchDto {
   info: {
     game_datetime: number; // epoch ms
     queue_id: number;
-    tft_set_number?: number;
+    tft_set_number: number;
     participants: TftParticipantDto[];
   };
 }
@@ -87,21 +88,42 @@ export interface ProfileRank extends RankEntry {
 export interface RecentMatch {
   matchId: string;
   date: string; // YYYY-MM-DD
+  set: number;
   queueType: QueueType;
   placement: number;
   lpChange: number | null; // only known when a rank snapshot brackets the match
   rankAfter: string | null;
 }
 
-export interface PlayerProfile {
+export interface SeasonStats {
+  totalMatches: number;
+  rankedMatches: number;
+  winRate: number; // top-4 rate, which is how Riot counts a TFT "win"
+  avgPlacement: number;
+  top1Rate: number;
+}
+
+export interface Season extends SeasonStats {
+  set: number;
+  label: string; // "Set 18"
+  current: boolean;
+  matches: RecentMatch[]; // newest first, the whole season
+}
+
+export interface HistoryStatus {
+  complete: boolean; // every match in the tracked seasons is cached
+  syncing: boolean; // a background backfill is running now
+}
+
+/** Top-level stats and recentMatches describe the current season; `seasons` has each tracked season. */
+export interface PlayerProfile extends SeasonStats {
   riotId: string;
   region: string;
   verified: true;
   rank: ProfileRank | null;
-  totalMatches: number;
-  winRate: number; // top-4 rate, which is how Riot counts a TFT "win"
-  avgPlacement: number;
-  top1Rate: number;
   highestRank: string | null;
   recentMatches: RecentMatch[];
+  currentSet: number | null;
+  seasons: Season[]; // newest first: the current set plus previous ones
+  history: HistoryStatus;
 }

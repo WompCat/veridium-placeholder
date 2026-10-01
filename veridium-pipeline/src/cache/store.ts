@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS players (
   -- game_datetime of the newest match in this player's own match-id list: the incremental cursor.
   -- (Not MAX(matchups.timestamp): lobby-mates' matchups get stored when someone else is ingested.)
   last_match_at  INTEGER,
+  -- Oldest set whose full history has been backfilled for this player (null = never finished).
+  history_set    INTEGER,
   updated_at  INTEGER NOT NULL
 );
 
@@ -20,6 +22,7 @@ CREATE TABLE IF NOT EXISTS matches (
   match_id       TEXT PRIMARY KEY,
   game_datetime  INTEGER NOT NULL,
   queue_id       INTEGER NOT NULL,
+  set_number     INTEGER,
   raw_json       TEXT NOT NULL
 );
 
@@ -64,6 +67,18 @@ export class Store {
     this.db = new Database(dbPath);
     this.db.pragma('journal_mode = WAL');
     this.db.exec(SCHEMA);
+    this.migrate();
+  }
+
+  /** Bring databases created by earlier versions up to the current schema. */
+  private migrate(): void {
+    const hasColumn = (table: string, column: string) =>
+      (this.db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).some((c) => c.name === column);
+    if (!hasColumn('matches', 'set_number')) {
+      this.db.exec(`ALTER TABLE matches ADD COLUMN set_number INTEGER`);
+      this.db.exec(`UPDATE matches SET set_number = json_extract(raw_json, '$.info.tft_set_number')`);
+    }
+    if (!hasColumn('players', 'history_set')) this.db.exec(`ALTER TABLE players ADD COLUMN history_set INTEGER`);
   }
 
   upsertPlayer(p: StoredPlayer): void {
@@ -85,13 +100,19 @@ export class Store {
 
   saveMatch(raw: TftMatchDto, matchups: Array<{ puuid: string; matchup: Matchup }>): void {
     const insertMatch = this.db.prepare(
-      `INSERT OR IGNORE INTO matches (match_id, game_datetime, queue_id, raw_json) VALUES (?, ?, ?, ?)`,
+      `INSERT OR IGNORE INTO matches (match_id, game_datetime, queue_id, set_number, raw_json) VALUES (?, ?, ?, ?, ?)`,
     );
     const insertMatchup = this.db.prepare(
       `INSERT OR IGNORE INTO matchups (puuid, match_id, queue_type, placement, timestamp) VALUES (?, ?, ?, ?, ?)`,
     );
     this.db.transaction(() => {
-      insertMatch.run(raw.metadata.match_id, raw.info.game_datetime, raw.info.queue_id, JSON.stringify(raw));
+      insertMatch.run(
+        raw.metadata.match_id,
+        raw.info.game_datetime,
+        raw.info.queue_id,
+        raw.info.tft_set_number,
+        JSON.stringify(raw),
+      );
       for (const { puuid, matchup: m } of matchups) {
         insertMatchup.run(puuid, m.matchId, m.queueType, m.placement, Date.parse(m.timestamp));
       }
@@ -108,26 +129,87 @@ export class Store {
 
   /** Newest game_datetime among the given (cached) match ids, or null. */
   newestMatchTime(matchIds: string[]): number | null {
+    return this.matchTimeAgg('MAX', matchIds);
+  }
+
+  /** Oldest game_datetime among the given (cached) match ids, or null. */
+  oldestMatchTime(matchIds: string[]): number | null {
+    return this.matchTimeAgg('MIN', matchIds);
+  }
+
+  private matchTimeAgg(fn: 'MIN' | 'MAX', matchIds: string[]): number | null {
     if (!matchIds.length) return null;
     const row = this.db
-      .prepare(`SELECT MAX(game_datetime) AS ts FROM matches WHERE match_id IN (${matchIds.map(() => '?').join(',')})`)
+      .prepare(`SELECT ${fn}(game_datetime) AS ts FROM matches WHERE match_id IN (${matchIds.map(() => '?').join(',')})`)
       .get(...matchIds) as { ts: number | null };
     return row.ts;
   }
 
-  /** Newest first. */
-  getMatchups(puuid: string, limit: number): Matchup[] {
+  /** Set number of a cached match, or null if it isn't cached. */
+  matchSet(matchId: string): number | null {
+    const row = this.db.prepare('SELECT set_number FROM matches WHERE match_id = ?').get(matchId) as
+      | { set_number: number | null }
+      | undefined;
+    return row?.set_number ?? null;
+  }
+
+  /** The newest set seen in any cached match: the current season. */
+  latestSet(): number | null {
+    const row = this.db.prepare('SELECT MAX(set_number) AS s FROM matches').get() as { s: number | null };
+    return row.s;
+  }
+
+  findPlayer(gameName: string, tagLine: string, region: string): StoredPlayer | null {
+    const row = this.db
+      .prepare(
+        `SELECT puuid, game_name, tag_line, region, last_match_at FROM players
+         WHERE game_name = ? COLLATE NOCASE AND tag_line = ? COLLATE NOCASE AND region = ?
+         ORDER BY updated_at DESC LIMIT 1`,
+      )
+      .get(gameName, tagLine, region.toLowerCase()) as
+      | { puuid: string; game_name: string; tag_line: string; region: string; last_match_at: number | null }
+      | undefined;
+    return row
+      ? { puuid: row.puuid, gameName: row.game_name, tagLine: row.tag_line, region: row.region, lastMatchAt: row.last_match_at }
+      : null;
+  }
+
+  /** True once the player's history has been backfilled back to at least `minSet`. */
+  historyComplete(puuid: string, minSet: number): boolean {
+    const row = this.db.prepare('SELECT history_set FROM players WHERE puuid = ?').get(puuid) as
+      | { history_set: number | null }
+      | undefined;
+    return row?.history_set != null && row.history_set <= minSet;
+  }
+
+  markHistoryComplete(puuid: string, minSet: number): void {
+    this.db
+      .prepare('UPDATE players SET history_set = MIN(COALESCE(history_set, ?), ?) WHERE puuid = ?')
+      .run(minSet, minSet, puuid);
+  }
+
+  /** The player's matchups from `minSet` onward, newest first. */
+  getMatchups(puuid: string, minSet: number): Matchup[] {
     const rows = this.db
       .prepare(
-        `SELECT match_id, queue_type, placement, timestamp FROM matchups
-         WHERE puuid = ? ORDER BY timestamp DESC LIMIT ?`,
+        `SELECT mu.match_id, mu.queue_type, mu.placement, mu.timestamp, m.set_number
+         FROM matchups mu JOIN matches m ON m.match_id = mu.match_id
+         WHERE mu.puuid = ? AND m.set_number >= ?
+         ORDER BY mu.timestamp DESC`,
       )
-      .all(puuid, limit) as Array<{ match_id: string; queue_type: QueueType; placement: number; timestamp: number }>;
+      .all(puuid, minSet) as Array<{
+      match_id: string;
+      queue_type: QueueType;
+      placement: number;
+      timestamp: number;
+      set_number: number;
+    }>;
     return rows.map((r) => ({
       matchId: r.match_id,
       queueType: r.queue_type,
       placement: r.placement,
       timestamp: new Date(r.timestamp).toISOString(),
+      set: r.set_number,
     }));
   }
 

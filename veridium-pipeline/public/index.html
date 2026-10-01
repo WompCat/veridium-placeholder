@@ -95,6 +95,18 @@
   .notice[hidden] { display: none; }
   .loading { opacity: .5; pointer-events: none; }
 
+  .season-tabs { display: flex; gap: 24px; border-bottom: 1px solid var(--border); margin: 4px 0 16px; overflow-x: auto; }
+  .season-tabs button { border: 0; background: none; font: inherit; font-weight: 600; color: var(--muted); padding: 8px 0 10px; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+  .season-tabs button.on { color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
+  .season-tabs .count { font-size: 11px; font-weight: 600; background: var(--bg); color: var(--muted); border-radius: 999px; padding: 1px 7px; }
+  .season-tabs button.on .count { background: var(--accent-soft); color: var(--accent); }
+  .expand { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin-top: 8px; border: 1px solid var(--border); background: var(--card); color: var(--accent); border-radius: 10px; padding: 10px; font: inherit; font-weight: 600; cursor: pointer; }
+  .expand:hover { background: var(--accent-soft); }
+  .expand[hidden] { display: none; }
+  .expand .chev { transition: transform .15s; }
+  .expand[aria-expanded="true"] .chev { transform: rotate(180deg); }
+  .notice.info { background: var(--accent-soft); border-color: #cfd3ff; color: #2f2a8a; }
+
   @media (max-width: 960px) {
     main { grid-template-columns: minmax(0, 1fr); }
     .nav-links { display: none; }
@@ -157,17 +169,18 @@
           <div class="sub" id="windowNote">Riot Games · Ranked &amp; Normal</div>
         </div>
       </div>
+      <div class="season-tabs" id="seasonTabs" role="tablist" aria-label="Season"></div>
       <div class="stats">
         <div class="stat"><div class="label">Total Matches</div><div class="value" id="total">–</div><div class="hint" id="totalHint"></div></div>
         <div class="stat"><div class="label">Win Rate (Top 4)</div><div class="value" id="winRate">–</div><div class="hint" id="winHint"></div></div>
         <div class="stat"><div class="label">Avg. Place</div><div class="value" id="avg">–</div><div class="hint" id="avgHint"></div></div>
-        <div class="stat"><div class="label">Highest Rank</div><div class="value" id="highest" style="font-size:18px">–</div><div class="hint">Seen by Veridium</div></div>
+        <div class="stat"><div class="label" id="fourthLabel">Highest Rank</div><div class="value" id="fourth" style="font-size:18px">–</div><div class="hint" id="fourthHint">Seen by Veridium</div></div>
       </div>
     </section>
 
     <section class="card pad">
       <div class="table-head">
-        <h2>Recent Matches</h2>
+        <h2 id="matchesTitle">Matches</h2>
         <div class="seg" id="queueFilter">
           <button data-q="RANKED_TFT" class="on">Ranked</button>
           <button data-q="NORMAL_TFT">Normal</button>
@@ -180,6 +193,7 @@
           <tbody id="matches"></tbody>
         </table>
       </div>
+      <button class="expand" id="expand" aria-expanded="false" aria-controls="matches" hidden></button>
     </section>
   </div>
 
@@ -207,19 +221,38 @@
 </main>
 
 <script>
+  const COLLAPSED_ROWS = 5;
+
   // Shown only when the API isn't reachable (e.g. page opened as a file, or no RIOT_API_KEY yet).
-  const SAMPLE = {
-    riotId: 'ShadowReign#NA1', region: 'na1', verified: true,
-    rank: { tier: 'DIAMOND', division: 'IV', leaguePoints: 42, percentile: 0.008 },
-    totalMatches: 482, winRate: 0.527, avgPlacement: 3.8, top1Rate: 0.14, highestRank: 'DIAMOND IV',
-    recentMatches: [
-      { matchId: 'NA1_123', date: '2026-09-27', queueType: 'RANKED_TFT', placement: 1, lpChange: 43, rankAfter: 'DIAMOND IV' },
-      { matchId: 'NA1_122', date: '2026-09-26', queueType: 'RANKED_TFT', placement: 4, lpChange: 12, rankAfter: 'DIAMOND IV' },
-      { matchId: 'NA1_121', date: '2026-09-26', queueType: 'RANKED_TFT', placement: 3, lpChange: 16, rankAfter: 'DIAMOND IV' },
-      { matchId: 'NA1_120', date: '2026-09-25', queueType: 'RANKED_TFT', placement: 8, lpChange: -23, rankAfter: 'DIAMOND III' },
-      { matchId: 'NA1_119', date: '2026-09-24', queueType: 'RANKED_TFT', placement: 2, lpChange: 27, rankAfter: 'DIAMOND III' },
-    ],
-  };
+  const SAMPLE = (() => {
+    const m = (id, date, set, placement, lpChange = null, rankAfter = null, queueType = 'RANKED_TFT') =>
+      ({ matchId: id, date, set, queueType, placement, lpChange, rankAfter });
+    const current = [
+      m('NA1_130', '2026-09-27', 18, 1, 43, 'DIAMOND IV'), m('NA1_129', '2026-09-26', 18, 4, 12, 'DIAMOND IV'),
+      m('NA1_128', '2026-09-26', 18, 3, 16, 'DIAMOND IV'), m('NA1_127', '2026-09-25', 18, 8, -23, 'DIAMOND III'),
+      m('NA1_126', '2026-09-24', 18, 2, 27, 'DIAMOND III'), m('NA1_125', '2026-09-22', 18, 5),
+      m('NA1_124', '2026-09-21', 18, 6, null, null, 'NORMAL_TFT'), m('NA1_123', '2026-09-20', 18, 1),
+    ];
+    const past = [m('NA1_101', '2026-07-30', 17, 2), m('NA1_100', '2026-07-28', 17, 7), m('NA1_99', '2026-07-21', 17, 4)];
+    const stats = (ms) => {
+      const n = ms.length, top4 = ms.filter((x) => x.placement <= 4).length;
+      return {
+        totalMatches: n, rankedMatches: ms.filter((x) => x.queueType === 'RANKED_TFT').length, winRate: top4 / n,
+        avgPlacement: ms.reduce((t, x) => t + x.placement, 0) / n, top1Rate: ms.filter((x) => x.placement === 1).length / n,
+      };
+    };
+    return {
+      riotId: 'ShadowReign#NA1', region: 'na1', verified: true,
+      rank: { tier: 'DIAMOND', division: 'IV', leaguePoints: 42, percentile: 0.008 },
+      highestRank: 'DIAMOND IV', currentSet: 18, ...stats(current), recentMatches: current,
+      history: { complete: true, syncing: false },
+      seasons: [
+        { set: 18, label: 'Set 18', current: true, ...stats(current), matches: current },
+        { set: 17, label: 'Set 17', current: false, ...stats(past), matches: past },
+        { set: 16, label: 'Set 16', current: false, totalMatches: 0, rankedMatches: 0, winRate: 0, avgPlacement: 0, top1Rate: 0, matches: [] },
+      ],
+    };
+  })();
 
   const $ = (id) => document.getElementById(id);
   const title = (s) => s ? s.charAt(0) + s.slice(1).toLowerCase() : s;
@@ -229,11 +262,15 @@
   const fmtDate = (d) => new Date(d + 'T12:00:00Z').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-  let profile = null;
-  let queue = 'RANKED_TFT';
+  const view = { profile: null, set: null, queue: 'RANKED_TFT', expanded: false };
+  let pollTimer = null;
 
-  function render(p) {
-    profile = p;
+  function selectedSeason() {
+    const seasons = view.profile.seasons || [];
+    return seasons.find((s) => s.set === view.set) || seasons[0] || null;
+  }
+
+  function renderHeader(p) {
     const [name, tag] = p.riotId.split('#');
     $('name').textContent = name;
     $('avatar').textContent = name.charAt(0).toUpperCase();
@@ -244,32 +281,55 @@
     if (p.rank) {
       const apex = ['MASTER', 'GRANDMASTER', 'CHALLENGER'].includes(p.rank.tier);
       $('rankText').textContent = fmtRank(apex ? p.rank.tier : `${p.rank.tier} ${p.rank.division}`);
-      $('rankSub').textContent = p.rank.percentile != null ? `TFT Ranked · Top ${pct(p.rank.percentile)}` : `TFT Ranked · ${p.rank.leaguePoints} LP`;
+      $('rankSub').textContent = p.rank.percentile != null
+        ? `TFT Ranked · Top ${pct(p.rank.percentile)}` : `TFT Ranked · ${p.rank.leaguePoints} LP`;
       $('lp').textContent = `${p.rank.leaguePoints} LP`;
     } else {
       $('rankText').textContent = 'Unranked';
       $('rankSub').textContent = 'TFT Ranked';
       $('lp').textContent = '–';
     }
-
-    const ranked = p.recentMatches.filter((m) => m.queueType === 'RANKED_TFT').length;
-    $('total').textContent = p.totalMatches;
-    $('totalHint').textContent = `(${ranked} Ranked / ${p.recentMatches.length - ranked} Normal)`;
-    $('winRate').textContent = pct(p.winRate);
-    const wins = Math.round(p.winRate * p.totalMatches);
-    $('winHint').textContent = `(${wins}W / ${p.totalMatches - wins}L)`;
-    $('avg').textContent = p.avgPlacement ? p.avgPlacement.toFixed(1) : '–';
-    $('avgHint').textContent = `(1st: ${pct(p.top1Rate ?? 0)})`;
-    $('top1').textContent = pct(p.top1Rate ?? 0);
-    $('highest').textContent = fmtRank(p.highestRank);
-    $('windowNote').textContent = `Riot Games · Ranked & Normal · Last ${p.totalMatches} games`;
     const last = p.recentMatches[0];
     $('lastMatch').textContent = last ? `${fmtDate(last.date)} · ${ord(last.placement)} Place` : '–';
-    renderMatches();
+    $('top1').textContent = pct(p.top1Rate ?? 0);
+  }
+
+  function renderSeasonTabs() {
+    $('seasonTabs').innerHTML = (view.profile.seasons || []).map((s) =>
+      `<button role="tab" data-set="${s.set}" aria-selected="${s.set === view.set}" class="${s.set === view.set ? 'on' : ''}">
+        ${esc(s.label)}${s.current ? ' · Current' : ''}<span class="count">${s.totalMatches}</span></button>`).join('');
+  }
+
+  function renderSeasonStats() {
+    const s = selectedSeason();
+    if (!s) return;
+    $('total').textContent = s.totalMatches;
+    $('totalHint').textContent = `(${s.rankedMatches} Ranked / ${s.totalMatches - s.rankedMatches} Normal)`;
+    $('winRate').textContent = s.totalMatches ? pct(s.winRate) : '–';
+    const wins = Math.round(s.winRate * s.totalMatches);
+    $('winHint').textContent = s.totalMatches ? `(${wins}W / ${s.totalMatches - wins}L)` : '';
+    $('avg').textContent = s.totalMatches ? s.avgPlacement.toFixed(1) : '–';
+    $('avgHint').textContent = s.totalMatches ? `(1st: ${pct(s.top1Rate)})` : '';
+    if (s.current) {
+      $('fourthLabel').textContent = 'Highest Rank';
+      $('fourth').textContent = fmtRank(view.profile.highestRank);
+      $('fourthHint').textContent = 'Seen by Veridium';
+    } else {
+      // Riot only reports the current rank, so past seasons show finishes instead.
+      $('fourthLabel').textContent = '1st Place Finishes';
+      $('fourth').textContent = s.matches.filter((m) => m.placement === 1).length;
+      $('fourthHint').textContent = 'Rank not tracked for past sets';
+    }
+    $('windowNote').textContent = `Riot Games · ${s.label}${s.current ? ' (current season)' : ''} · ${s.totalMatches} games`;
   }
 
   function renderMatches() {
-    const rows = profile.recentMatches.filter((m) => !queue || m.queueType === queue);
+    const s = selectedSeason();
+    const all = s ? s.matches.filter((m) => !view.queue || m.queueType === view.queue) : [];
+    const rows = view.expanded ? all : all.slice(0, COLLAPSED_ROWS);
+    const queueName = { RANKED_TFT: 'Ranked', NORMAL_TFT: 'Normal' }[view.queue] || 'All';
+    $('matchesTitle').textContent = s ? `${s.label} Matches` : 'Matches';
+
     $('matches').innerHTML = rows.length ? rows.map((m) => {
       const cls = m.placement === 1 ? 'p1' : m.placement <= 4 ? 'top4' : '';
       const lp = m.lpChange == null ? '<span class="dim">—</span>'
@@ -277,17 +337,65 @@
       return `<tr><td>${fmtDate(m.date)}</td><td><span class="place ${cls}">${ord(m.placement)}</span></td>
         <td>${lp}</td><td>${m.rankAfter ? esc(fmtRank(m.rankAfter)) : '<span class="dim">—</span>'}</td>
         <td class="dim">${esc(m.matchId)}</td></tr>`;
-    }).join('') : '<tr><td colspan="5" class="empty">No matches in this queue yet.</td></tr>';
+    }).join('') : `<tr><td colspan="5" class="empty">No ${queueName === 'All' ? '' : queueName.toLowerCase() + ' '}matches in ${s ? esc(s.label) : 'this season'}${view.profile.history.complete ? '' : ' yet'}.</td></tr>`;
+
+    const btn = $('expand');
+    btn.hidden = all.length <= COLLAPSED_ROWS;
+    btn.setAttribute('aria-expanded', String(view.expanded));
+    btn.innerHTML = view.expanded
+      ? `Show fewer <span class="chev">▾</span>`
+      : `Show all ${all.length} ${queueName === 'All' ? '' : queueName.toLowerCase() + ' '}matches <span class="chev">▾</span>`;
   }
 
-  function notice(text, isError) {
+  function render(p) {
+    view.profile = p;
+    const sets = (p.seasons || []).map((s) => s.set);
+    if (!sets.includes(view.set)) view.set = sets[0] ?? null;
+    renderHeader(p);
+    renderSeasonTabs();
+    renderSeasonStats();
+    renderMatches();
+  }
+
+  function notice(text, kind) {
     const n = $('notice');
     n.hidden = !text;
     n.textContent = text || '';
-    n.classList.toggle('error', !!isError);
+    n.className = 'notice' + (kind ? ' ' + kind : '');
+  }
+
+  function historyNotice(p) {
+    const seasons = p.seasons || [];
+    const loaded = seasons.reduce((n, s) => n + s.totalMatches, 0);
+    const range = seasons.length > 1 ? `${seasons.at(-1).label}–${seasons[0].set}` : seasons[0]?.label || '';
+    if (p.history.syncing) {
+      notice(`Loading match history for ${range}: ${loaded} matches so far. This page updates as they arrive.`, 'info');
+    } else if (!p.history.complete) {
+      notice('Match history is incomplete. Reload the page to resume loading it.', 'info');
+    } else {
+      notice('');
+    }
+  }
+
+  // While the server backfills history, re-read the cached profile (no Riot calls) every few seconds.
+  function pollHistory(riotId, region) {
+    clearTimeout(pollTimer);
+    pollTimer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/players/${encodeURIComponent(region)}/${encodeURIComponent(riotId)}/profile?cached=1`);
+        if (!res.ok) return;
+        const p = await res.json();
+        render(p);
+        historyNotice(p);
+        if (p.history.syncing) pollHistory(riotId, region);
+      } catch {
+        pollHistory(riotId, region);
+      }
+    }, 4000);
   }
 
   async function load(riotId, region) {
+    clearTimeout(pollTimer);
     const url = new URL(location.href);
     url.searchParams.set('riotId', riotId);
     url.searchParams.set('region', region);
@@ -297,12 +405,15 @@
       const res = await fetch(`/api/players/${encodeURIComponent(region)}/${encodeURIComponent(riotId)}/profile`);
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw Object.assign(new Error(body.error || `HTTP ${res.status}`), { api: true });
-      notice('');
+      view.set = body.currentSet;
+      view.expanded = false;
       render(body);
+      historyNotice(body);
+      if (body.history.syncing) pollHistory(riotId, region);
     } catch (err) {
       if (err.api) {
-        notice(err.message, true);
-        if (!profile) render(SAMPLE);
+        notice(err.message, 'error');
+        if (!view.profile) render(SAMPLE);
       } else {
         notice('Pipeline API not reachable: showing sample data. Start it with "npm run dev" and open http://localhost:4000.');
         render(SAMPLE);
@@ -312,12 +423,28 @@
     }
   }
 
+  $('seasonTabs').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b || !view.profile) return;
+    view.set = Number(b.dataset.set);
+    view.expanded = false;
+    renderSeasonTabs();
+    renderSeasonStats();
+    renderMatches();
+  });
+
   $('queueFilter').addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b) return;
-    queue = b.dataset.q;
+    view.queue = b.dataset.q;
+    view.expanded = false;
     document.querySelectorAll('#queueFilter button').forEach((x) => x.classList.toggle('on', x === b));
-    if (profile) renderMatches();
+    if (view.profile) renderMatches();
+  });
+
+  $('expand').addEventListener('click', () => {
+    view.expanded = !view.expanded;
+    renderMatches();
   });
 
   $('search').addEventListener('submit', (e) => {
