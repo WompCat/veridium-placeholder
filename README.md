@@ -19,6 +19,15 @@ npm run dev                 # http://localhost:4000/?riotId=WompCat%23NA1&region
 Riot development keys expire every 24 hours, so regenerate yours at
 <https://developer.riotgames.com> and update `.env` when requests start returning 401/403.
 
+### In a Claude Code cloud session
+
+The environment's network proxy injects the Riot key, so no real key lives in the container. Node's
+`fetch` only goes through that proxy when told to:
+
+```bash
+NODE_USE_ENV_PROXY=1 RIOT_API_KEY=proxy-injected npm run ingest -- "WompCat#NA1" na1
+```
+
 ## Pipeline
 
 ```
