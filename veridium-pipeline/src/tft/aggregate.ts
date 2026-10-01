@@ -1,4 +1,13 @@
-import type { Matchup, PlayerProfile, RankEntry, RankSnapshot, RecentMatch } from '../types';
+import type {
+  HistoryStatus,
+  Matchup,
+  PlayerProfile,
+  RankEntry,
+  RankSnapshot,
+  RecentMatch,
+  Season,
+  SeasonStats,
+} from '../types';
 
 const TIERS = ['IRON', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'EMERALD', 'DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER'];
 const DIVISIONS = ['IV', 'III', 'II', 'I'];
@@ -57,45 +66,79 @@ function rankContext(m: Matchup, snapshots: RankSnapshot[], nextRankedAt: number
   return { lpChange, rankAfter };
 }
 
-/** Matchups (newest first, already windowed) + rank snapshots (oldest first) -> profile response. */
+function seasonStats(matches: RecentMatch[]): SeasonStats {
+  const total = matches.length;
+  const top4 = matches.filter((m) => m.placement <= 4).length;
+  const firsts = matches.filter((m) => m.placement === 1).length;
+  const placementSum = matches.reduce((sum, m) => sum + m.placement, 0);
+  return {
+    totalMatches: total,
+    rankedMatches: matches.filter((m) => m.queueType === 'RANKED_TFT').length,
+    winRate: total ? round(top4 / total, 3) : 0,
+    avgPlacement: total ? round(placementSum / total, 2) : 0,
+    top1Rate: total ? round(firsts / total, 3) : 0,
+  };
+}
+
+/** The sets to show, newest first: the current one and the `count - 1` before it. */
+export function trackedSets(currentSet: number | null, count: number): number[] {
+  if (currentSet === null) return [];
+  return Array.from({ length: count }, (_, i) => currentSet - i).filter((s) => s > 0);
+}
+
+/**
+ * Matchups (newest first) + rank snapshots (oldest first) -> profile response.
+ * Top-level stats describe the current season; `seasons` holds every tracked one.
+ */
 export function buildProfile(input: {
   riotId: string;
   region: string;
   matchups: Matchup[];
   snapshots: RankSnapshot[];
+  currentSet: number | null;
+  sets: number[]; // newest first
+  history: HistoryStatus;
 }): PlayerProfile {
-  const { matchups, snapshots } = input;
-  const total = matchups.length;
-  const top4 = matchups.filter((m) => m.placement <= 4).length;
-  const firsts = matchups.filter((m) => m.placement === 1).length;
-  const placementSum = matchups.reduce((sum, m) => sum + m.placement, 0);
+  const { matchups, snapshots, currentSet } = input;
 
   let nextRankedAt = Infinity;
-  const recentMatches: RecentMatch[] = matchups.map((m) => {
+  const all: RecentMatch[] = matchups.map((m) => {
     const ctx = rankContext(m, snapshots, nextRankedAt);
     if (m.queueType === 'RANKED_TFT') nextRankedAt = Date.parse(m.timestamp);
     return {
       matchId: m.matchId,
       date: m.timestamp.slice(0, 10),
+      set: m.set,
       queueType: m.queueType,
       placement: m.placement,
       ...ctx,
     };
   });
 
-  const current = snapshots.at(-1);
+  const seasons: Season[] = input.sets.map((set) => {
+    const matches = all.filter((m) => m.set === set);
+    return { set, label: `Set ${set}`, current: set === currentSet, ...seasonStats(matches), matches };
+  });
+  const current = seasons.find((s) => s.current);
+  const { matches: currentMatches = [], ...currentStats } = current ?? { ...seasonStats([]), matches: [] };
+
+  const latest = snapshots.at(-1);
   return {
     riotId: input.riotId,
     region: input.region,
     verified: true,
-    rank: current
-      ? { tier: current.tier, division: current.division, leaguePoints: current.leaguePoints, percentile: null }
+    rank: latest
+      ? { tier: latest.tier, division: latest.division, leaguePoints: latest.leaguePoints, percentile: null }
       : null,
-    totalMatches: total,
-    winRate: total ? round(top4 / total, 3) : 0,
-    avgPlacement: total ? round(placementSum / total, 2) : 0,
-    top1Rate: total ? round(firsts / total, 3) : 0,
+    totalMatches: currentStats.totalMatches,
+    rankedMatches: currentStats.rankedMatches,
+    winRate: currentStats.winRate,
+    avgPlacement: currentStats.avgPlacement,
+    top1Rate: currentStats.top1Rate,
     highestRank: highestRank(snapshots),
-    recentMatches,
+    recentMatches: currentMatches,
+    currentSet,
+    seasons,
+    history: input.history,
   };
 }

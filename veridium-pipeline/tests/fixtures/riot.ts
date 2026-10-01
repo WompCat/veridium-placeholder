@@ -6,8 +6,10 @@ export const ACCOUNT: RiotAccountDto = { puuid: PUUID, gameName: 'WompCat', tagL
 const DAY = 86_400_000;
 export const BASE_TIME = Date.UTC(2026, 8, 20, 18, 0, 0); // Sep 20 2026
 
-/** A match where our player finished `placement`; the other 7 lobby slots are filled in. */
-export function makeMatch(n: number, placement: number, queueId = 1100): TftMatchDto {
+export const CURRENT_SET = 18;
+
+/** A match where our player finished `placement`; the other 7 lobby slots are filled in. Higher `n` = newer. */
+export function makeMatch(n: number, placement: number, queueId = 1100, set = CURRENT_SET): TftMatchDto {
   const others = [1, 2, 3, 4, 5, 6, 7, 8].filter((p) => p !== placement);
   const participants = [
     { puuid: PUUID, placement },
@@ -15,7 +17,7 @@ export function makeMatch(n: number, placement: number, queueId = 1100): TftMatc
   ];
   return {
     metadata: { match_id: `NA1_${1000 + n}`, participants: participants.map((p) => p.puuid) },
-    info: { game_datetime: BASE_TIME + n * DAY, queue_id: queueId, tft_set_number: 15, participants },
+    info: { game_datetime: BASE_TIME + n * DAY, queue_id: queueId, tft_set_number: set, participants },
   };
 }
 
@@ -25,7 +27,8 @@ export function leagueEntry(tier: string, rank: string, lp: number, wins: number
 
 interface MockRiot {
   account?: RiotAccountDto | null;
-  matchIds: string[];
+  /** Defaults to every match in `matches`, newest first. */
+  matchIds?: string[];
   matches: TftMatchDto[];
   league: TftLeagueEntryDto[];
   /** Responses to return (in order) before the real one, keyed by URL substring. */
@@ -49,11 +52,23 @@ export function mockRiotFetch(riot: MockRiot) {
     if (url.includes('/riot/account/v1/accounts/by-riot-id/')) {
       return riot.account === null ? notFound() : json(riot.account ?? ACCOUNT);
     }
-    if (url.includes('/tft/match/v1/matches/by-puuid/')) return json(riot.matchIds);
+    if (url.includes('/tft/match/v1/matches/by-puuid/')) {
+      const all =
+        riot.matchIds ??
+        [...riot.matches].sort((a, b) => b.info.game_datetime - a.info.game_datetime).map((m) => m.metadata.match_id);
+      const params = new URL(url).searchParams;
+      const start = Number(params.get('start') ?? 0);
+      return json(all.slice(start, start + Number(params.get('count') ?? 20)));
+    }
     if (url.includes('/tft/league/v1/by-puuid/')) return json(riot.league);
     const matchId = url.match(/\/tft\/match\/v1\/matches\/([^/?]+)$/)?.[1];
     const match = riot.matches.find((m) => m.metadata.match_id === matchId);
     return match ? json(match) : notFound();
   };
-  return { fetch, calls, matchCalls: () => calls.filter((c) => /\/matches\/NA1_/.test(c)) };
+  return {
+    fetch,
+    calls,
+    matchCalls: () => calls.filter((c) => /\/matches\/NA1_/.test(c)),
+    idsCalls: () => calls.filter((c) => c.includes('/ids?')).map((c) => new URL(c).search),
+  };
 }

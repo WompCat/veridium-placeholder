@@ -25,7 +25,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const deps: IngestDeps = {
     client: new RiotClient({ apiKey: config.riotApiKey }),
     store: new Store(config.dbPath),
-    matchWindow: config.matchWindow,
+    seasons: config.seasons,
   };
   createApp(deps).listen(config.port, () => {
     console.log(`Veridium pipeline on http://localhost:${config.port}`);

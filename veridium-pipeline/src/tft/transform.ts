@@ -13,7 +13,13 @@ export function toMatchups(raw: TftMatchDto): Array<{ puuid: string; matchup: Ma
   const timestamp = new Date(raw.info.game_datetime).toISOString();
   return raw.info.participants.map((p) => ({
     puuid: p.puuid,
-    matchup: { matchId: raw.metadata.match_id, queueType, placement: p.placement, timestamp },
+    matchup: {
+      matchId: raw.metadata.match_id,
+      queueType,
+      placement: p.placement,
+      timestamp,
+      set: raw.info.tft_set_number,
+    },
   }));
 }
 
