@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Veridium Vacancies</title>
+<link rel="icon" href="data:," />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="app.css" />
+<style>
+  main { grid-template-columns: minmax(0, 1fr) 320px; }
+  .org-chip { width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg, #2f3bd6, #11145a); color: #fff; display: grid; place-items: center; font-weight: 800; flex: none; }
+  .apply-form { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 12px; }
+  h1.page { font-size: 26px; margin: 0 0 4px; }
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="logo">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 5h8l5 13 5-13h8L19 28h-6z" fill="#4f46e5"/><path d="M11 5l5 13 5-13h-3l-2 6-2-6z" fill="#8b83ff"/></svg>
+    VERIDIUM
+  </div>
+  <div style="flex:1"></div>
+  <div class="nav-links"><a href="/">Players</a><a href="org.html?id=obscurity-esports">Organizations</a><span>Tournaments</span><a class="active" href="jobs.html">Jobs</a></div>
+</nav>
+
+<main>
+  <div class="stack">
+    <section class="card pad">
+      <h1 class="page">Vacancies</h1>
+      <div class="sub">Open roles from verified organizations. Your verified profile is your resume.</div>
+      <hr class="divider" />
+      <form class="form-row" id="filters">
+        <label class="field">Game<select name="game"><option value="">All games</option><option>TFT</option><option>LoL</option><option>Valorant</option><option>Overwatch 2</option></select></label>
+        <label class="field">Region<select name="region"><option value="">All regions</option><option>NA</option><option>EUW</option><option>EUNE</option><option>KR</option><option>BR</option><option>OCE</option></select></label>
+      </form>
+    </section>
+    <section class="list" id="list"><div class="card pad empty">Loading…</div></section>
+  </div>
+
+  <aside class="stack">
+    <section class="card pad">
+      <h2>How applying works</h2>
+      <div class="rows">
+        <div><span>1. Enter your Riot ID</span></div>
+        <div><span>2. Veridium loads your verified stats from Riot</span></div>
+        <div><span>3. The org sees your live profile, not a self-reported resume</span></div>
+      </div>
+    </section>
+  </aside>
+</main>
+
+<script src="common.js"></script>
+<script>
+  let openForm = null; // vacancy id with the apply form showing
+
+  async function loadList() {
+    const f = Object.fromEntries(new FormData($('filters')));
+    const params = new URLSearchParams(Object.entries(f).filter(([, v]) => v));
+    try {
+      const vacancies = await api(`/api/vacancies?${params}`);
+      $('list').innerHTML = vacancies.length ? vacancies.map((v) => `
+        <article class="card pad">
+          <div class="item-head">
+            <div class="who-cell">
+              <span class="org-chip">${esc(v.organizationName.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase())}</span>
+              <div><div class="item-title">${esc(v.title)}</div>
+                <div class="sub"><a href="org.html?id=${encodeURIComponent(v.organizationId)}">${esc(v.organizationName)}</a> · ${esc(v.game)} · ${esc(v.region)} · ${esc(titleCase(v.level))}</div></div>
+            </div>
+            <div style="text-align:right"><span class="sub">Posted ${esc(fmtDate(v.postedAt))}</span><br>
+              <button class="btn primary small" style="margin-top:6px" data-apply="${esc(v.id)}">Apply</button></div>
+          </div>
+          ${openForm === v.id ? `
+          <form class="apply-form form-row" data-vacancy="${esc(v.id)}">
+            <label class="field">Your Riot ID<input name="riotId" placeholder="Name#TAG" required /></label>
+            <label class="field" style="flex:0 1 90px">Region<select name="region">${regionOptions()}</select></label>
+            <button class="btn primary">Submit application</button>
+          </form>
+          <div class="form-msg" data-msg="${esc(v.id)}"></div>` : ''}
+        </article>`).join('') : '<div class="card pad empty">No open vacancies match these filters.</div>';
+    } catch (err) {
+      $('list').innerHTML = `<div class="card pad empty">${esc(err.message)}</div>`;
+    }
+  }
+
+  $('filters').addEventListener('change', loadList);
+
+  $('list').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-apply]');
+    if (!b) return;
+    openForm = openForm === b.dataset.apply ? null : b.dataset.apply;
+    loadList();
+  });
+
+  $('list').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const id = form.dataset.vacancy;
+    const msg = document.querySelector(`[data-msg="${CSS.escape(id)}"]`);
+    const f = Object.fromEntries(new FormData(form));
+    const btn = form.querySelector('button');
+    btn.disabled = true;
+    setMsg(msg, 'Loading your verified profile from Riot…');
+    try {
+      const profile = await loadPlayer(f.riotId.trim(), f.region);
+      await api(`/api/vacancies/${encodeURIComponent(id)}/applications`, {
+        method: 'POST', body: { riotId: profile.riotId, region: profile.region },
+      });
+      setMsg(msg, `Applied as ${profile.riotId}. The org will see your verified profile.`, 'ok');
+      openForm = null;
+      form.remove();
+    } catch (err) {
+      setMsg(msg, err.message, 'error');
+      btn.disabled = false;
+    }
+  });
+
+  loadList();
+</script>
+</body>
+</html>

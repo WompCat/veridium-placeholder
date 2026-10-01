@@ -1,55 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import type { Matchup, QueueType, RankSnapshot, TftMatchDto } from '../types';
 
-const SCHEMA = `
-CREATE TABLE IF NOT EXISTS players (
-  puuid       TEXT PRIMARY KEY,
-  game_name   TEXT NOT NULL,
-  tag_line    TEXT NOT NULL,
-  region      TEXT NOT NULL,
-  -- game_datetime of the newest match in this player's own match-id list: the incremental cursor.
-  -- (Not MAX(matchups.timestamp): lobby-mates' matchups get stored when someone else is ingested.)
-  last_match_at  INTEGER,
-  -- Oldest set whose full history has been backfilled for this player (null = never finished).
-  history_set    INTEGER,
-  updated_at  INTEGER NOT NULL
-);
-
--- Raw match JSON keyed by match id: a match is fetched from Riot at most once.
-CREATE TABLE IF NOT EXISTS matches (
-  match_id       TEXT PRIMARY KEY,
-  game_datetime  INTEGER NOT NULL,
-  queue_id       INTEGER NOT NULL,
-  set_number     INTEGER,
-  raw_json       TEXT NOT NULL
-);
-
--- One row per participant per match (all 8 players, so lobby-mates are cached too).
-CREATE TABLE IF NOT EXISTS matchups (
-  puuid       TEXT NOT NULL,
-  match_id    TEXT NOT NULL REFERENCES matches(match_id),
-  queue_type  TEXT NOT NULL,
-  placement   INTEGER NOT NULL,
-  timestamp   INTEGER NOT NULL,
-  PRIMARY KEY (puuid, match_id)
-);
-CREATE INDEX IF NOT EXISTS matchups_by_player ON matchups (puuid, timestamp DESC);
-
--- Rank is never cached per match; each ingestion run appends a fresh snapshot.
-CREATE TABLE IF NOT EXISTS rank_snapshots (
-  id             INTEGER PRIMARY KEY AUTOINCREMENT,
-  puuid          TEXT NOT NULL,
-  tier           TEXT NOT NULL,
-  division       TEXT NOT NULL,
-  league_points  INTEGER NOT NULL,
-  wins           INTEGER NOT NULL,
-  losses         INTEGER NOT NULL,
-  fetched_at     INTEGER NOT NULL
-);
-CREATE INDEX IF NOT EXISTS rank_snapshots_by_player ON rank_snapshots (puuid, fetched_at);
-`;
+// Numbered .sql files, applied in order once each and recorded in schema_migrations.
+const MIGRATIONS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'migrations');
 
 export interface StoredPlayer {
   puuid: string;
@@ -66,12 +22,35 @@ export class Store {
     if (dbPath !== ':memory:') fs.mkdirSync(path.dirname(dbPath), { recursive: true });
     this.db = new Database(dbPath);
     this.db.pragma('journal_mode = WAL');
-    this.db.exec(SCHEMA);
-    this.migrate();
+    this.db.pragma('foreign_keys = ON');
+    this.runMigrations();
+    this.patchPreSeasonColumns();
   }
 
-  /** Bring databases created by earlier versions up to the current schema. */
-  private migrate(): void {
+  /** Apply any migrations/NNN_*.sql not yet recorded, each in its own transaction. */
+  private runMigrations(): void {
+    this.db.exec(
+      'CREATE TABLE IF NOT EXISTS schema_migrations (version TEXT PRIMARY KEY, applied_at TEXT NOT NULL)',
+    );
+    const applied = new Set(
+      (this.db.prepare('SELECT version FROM schema_migrations').all() as Array<{ version: string }>).map((r) => r.version),
+    );
+    const files = fs
+      .readdirSync(MIGRATIONS_DIR)
+      .filter((f) => /^\d+_.+\.sql$/.test(f))
+      .sort();
+    for (const file of files) {
+      if (applied.has(file)) continue;
+      const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8');
+      this.db.transaction(() => {
+        this.db.exec(sql);
+        this.db.prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)').run(file, new Date().toISOString());
+      })();
+    }
+  }
+
+  /** Databases from before seasons were tracked lack these columns (001 can't add them to existing tables). */
+  private patchPreSeasonColumns(): void {
     const hasColumn = (table: string, column: string) =>
       (this.db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).some((c) => c.name === column);
     if (!hasColumn('matches', 'set_number')) {
@@ -167,6 +146,17 @@ export class Store {
          ORDER BY updated_at DESC LIMIT 1`,
       )
       .get(gameName, tagLine, region.toLowerCase()) as
+      | { puuid: string; game_name: string; tag_line: string; region: string; last_match_at: number | null }
+      | undefined;
+    return row
+      ? { puuid: row.puuid, gameName: row.game_name, tagLine: row.tag_line, region: row.region, lastMatchAt: row.last_match_at }
+      : null;
+  }
+
+  getPlayer(puuid: string): StoredPlayer | null {
+    const row = this.db
+      .prepare('SELECT puuid, game_name, tag_line, region, last_match_at FROM players WHERE puuid = ?')
+      .get(puuid) as
       | { puuid: string; game_name: string; tag_line: string; region: string; last_match_at: number | null }
       | undefined;
     return row

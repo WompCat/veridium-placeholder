@@ -25,11 +25,76 @@ export interface RankEntry {
   leaguePoints: number;
 }
 
-// Out of scope for the ingestion pipeline; typed now so the org dashboard can build on it.
+// ---- Organizations, rosters, vacancies (org & vacancy backend) ----
+
+/** The roster isn't stored on the org: it's derived from active OrgMembership rows joined against players. */
 export interface Organization {
   id: string;
   name: string;
-  roster: Player[];
+  createdAt: string;
+}
+
+export type MembershipStatus = 'active' | 'bench';
+
+export interface OrgMembership {
+  playerPuuid: string;
+  organizationId: string;
+  role: string;
+  status: MembershipStatus;
+  joinedAt: string;
+  leftAt: string | null;
+}
+
+export type VacancyLevel = 'competitive' | 'casual';
+export type VacancyStatus = 'open' | 'closed';
+
+export interface Vacancy {
+  id: string;
+  organizationId: string;
+  title: string;
+  game: string;
+  region: string;
+  level: VacancyLevel;
+  status: VacancyStatus;
+  postedAt: string;
+}
+
+export type ApplicationStatus = 'pending' | 'accepted' | 'rejected';
+
+export interface Application {
+  id: string;
+  vacancyId: string;
+  playerPuuid: string;
+  status: ApplicationStatus;
+  appliedAt: string;
+}
+
+/** A player's verified stats, read from the pipeline's tables at request time (never stored on org rows). */
+export interface PlayerSummary {
+  puuid: string;
+  riotId: string;
+  region: string;
+  verified: true;
+  rank: ProfileRank | null;
+  currentSet: number | null;
+  totalMatches: number;
+  rankedMatches: number;
+  winRate: number;
+  avgPlacement: number;
+}
+
+export interface RosterEntry extends OrgMembership {
+  player: PlayerSummary;
+}
+
+export interface VacancyListing extends Vacancy {
+  organizationName: string;
+  applicationCount: number;
+  pendingCount: number;
+}
+
+export interface ApplicationView extends Application {
+  player: PlayerSummary;
 }
 
 export interface Tournament {

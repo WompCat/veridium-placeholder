@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Veridium Org Dashboard</title>
+<link rel="icon" href="data:," />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="app.css" />
+<style>
+  .org-logo { width: 84px; height: 84px; border-radius: 18px; border: 3px solid rgba(255,255,255,.8); background: linear-gradient(135deg, #2f3bd6, #11145a); display: grid; place-items: center; font-size: 30px; font-weight: 800; flex: none; }
+  .kpi { background: rgba(10,12,40,.45); border: 1px solid rgba(255,255,255,.25); border-radius: 12px; padding: 10px 14px; min-width: 104px; }
+  .kpi b { display: block; font-size: 22px; }
+  .kpi span { font-size: 12px; opacity: .8; }
+  .banner .kpis { flex: 1 1 340px; max-width: 380px; }
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="logo">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 5h8l5 13 5-13h8L19 28h-6z" fill="#4f46e5"/><path d="M11 5l5 13 5-13h-3l-2 6-2-6z" fill="#8b83ff"/></svg>
+    VERIDIUM
+  </div>
+  <div style="flex:1"></div>
+  <div class="nav-links"><a href="/">Players</a><a class="active" href="org.html?id=obscurity-esports">Organizations</a><span>Tournaments</span><a href="jobs.html">Jobs</a></div>
+</nav>
+
+<main id="app">
+  <div class="notice error" id="notice" hidden></div>
+
+  <div class="stack">
+    <section class="card">
+      <div class="banner">
+        <div class="org-logo" id="orgLogo">?</div>
+        <div class="who">
+          <h1 id="orgName">Loading…</h1>
+          <div class="meta">Organization · Org Dashboard</div>
+        </div>
+        <div class="kpis">
+          <div class="kpi"><b id="kActive">–</b><span>Active</span></div>
+          <div class="kpi"><b id="kBench">–</b><span>Bench</span></div>
+          <div class="kpi"><b id="kOpen">–</b><span>Open roles</span></div>
+        </div>
+      </div>
+      <div class="tabs"><span>Overview</span><span class="on">Roster</span><span>Scrims</span><span>Vacancies</span><span>Settings</span></div>
+    </section>
+
+    <section class="card pad">
+      <div class="table-head">
+        <div><h2>Roster</h2><div class="sub">Stats are verified from official Riot APIs and update as players are loaded.</div></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Player</th><th>Role</th><th>Status</th><th>Rank</th><th>Win Rate</th><th>Joined</th><th></th></tr></thead>
+          <tbody id="roster"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+        </table>
+      </div>
+      <hr class="divider" />
+      <h2 style="font-size:14px;margin-bottom:10px">Add a player</h2>
+      <form class="form-row" id="addForm">
+        <label class="field">Riot ID<input name="riotId" placeholder="Name#TAG" required /></label>
+        <label class="field" style="flex:0 1 90px">Region<select name="region"></select></label>
+        <label class="field">Role<input name="role" placeholder="e.g. TFT, Flex, Sub" required maxlength="40" /></label>
+        <label class="field" style="flex:0 1 110px">Status<select name="status"><option value="active">Active</option><option value="bench">Bench</option></select></label>
+        <button class="btn primary">Add to roster</button>
+      </form>
+      <div class="form-msg" id="addMsg"></div>
+    </section>
+  </div>
+
+  <aside class="stack">
+    <section class="card pad">
+      <h2>Vacancies</h2>
+      <div class="sub" style="margin-bottom:14px">Players apply with their verified profile.</div>
+      <div class="list" id="vacancies"><div class="empty">Loading…</div></div>
+      <hr class="divider" />
+      <h2 style="font-size:14px;margin-bottom:10px">Post a vacancy</h2>
+      <form class="form-row" id="vacancyForm">
+        <label class="field" style="flex-basis:100%">Title<input name="title" placeholder="e.g. Flex Player" required maxlength="80" /></label>
+        <label class="field">Game<select name="game"><option>TFT</option><option>LoL</option><option>Valorant</option><option>Overwatch 2</option></select></label>
+        <label class="field">Region<select name="region"><option>NA</option><option>EUW</option><option>EUNE</option><option>KR</option><option>BR</option><option>OCE</option></select></label>
+        <label class="field">Level<select name="level"><option value="competitive">Competitive</option><option value="casual">Casual</option></select></label>
+        <button class="btn primary" style="flex-basis:100%">Post vacancy</button>
+      </form>
+      <div class="form-msg" id="vacancyMsg"></div>
+    </section>
+  </aside>
+</main>
+
+<script src="common.js"></script>
+<script>
+  const orgId = new URLSearchParams(location.search).get('id') || 'obscurity-esports';
+  const base = `/api/organizations/${encodeURIComponent(orgId)}`;
+  const openApplicants = new Set(); // vacancy ids whose applicant list is expanded
+  let roster = [];
+
+  document.querySelector('#addForm select[name=region]').innerHTML = regionOptions();
+
+  function notice(text) {
+    $('notice').hidden = !text;
+    $('notice').textContent = text || '';
+  }
+
+  function playerCell(p) {
+    return `<div class="who-cell"><span class="mini-avatar">${esc(p.riotId.charAt(0).toUpperCase())}</span>
+      <div><a href="${esc(profileUrl(p))}"><b>${esc(p.riotId.split('#')[0])}</b></a> <span class="verified" title="Verified">✔</span>
+      <div class="sub">#${esc(p.riotId.split('#')[1])} · ${esc(p.region.toUpperCase())}</div></div></div>`;
+  }
+
+  function renderRoster() {
+    $('kActive').textContent = roster.filter((m) => m.status === 'active').length;
+    $('kBench').textContent = roster.filter((m) => m.status === 'bench').length;
+    $('roster').innerHTML = roster.length ? roster.map((m) => `
+      <tr>
+        <td>${playerCell(m.player)}</td>
+        <td>${esc(m.role)}</td>
+        <td><span class="status ${esc(m.status)}">${esc(m.status)}</span></td>
+        <td>${esc(fmtRank(m.player.rank))}</td>
+        <td>${m.player.totalMatches ? pct(m.player.winRate) : '<span class="dim">—</span>'}</td>
+        <td>${esc(fmtDate(m.joinedAt))}</td>
+        <td style="text-align:right">
+          <button class="btn small" data-act="toggle" data-puuid="${esc(m.playerPuuid)}">${m.status === 'active' ? 'Bench' : 'Activate'}</button>
+          <button class="btn small bad" data-act="remove" data-puuid="${esc(m.playerPuuid)}">Remove</button>
+        </td>
+      </tr>`).join('') : '<tr><td colspan="7" class="empty">No players on the roster yet.</td></tr>';
+  }
+
+  async function loadRoster() {
+    roster = await api(`${base}/roster`);
+    renderRoster();
+  }
+
+  function applicantRows(apps) {
+    if (!apps.length) return '<div class="sub">No applications yet.</div>';
+    return apps.map((a) => `
+      <div class="applicant">
+        <div>${playerCell(a.player)}
+          <div class="sub" style="margin:4px 0 0 40px">${esc(fmtRank(a.player.rank))} · ${a.player.totalMatches ? pct(a.player.winRate) + ' top-4' : 'no games this set'} · applied ${esc(fmtDate(a.appliedAt))}</div>
+        </div>
+        ${a.status === 'pending'
+          ? `<div style="display:flex;gap:6px"><button class="btn small good" data-act="accept" data-app="${esc(a.id)}">Accept</button>
+             <button class="btn small bad" data-act="reject" data-app="${esc(a.id)}">Reject</button></div>`
+          : `<span class="status ${esc(a.status)}">${esc(a.status)}</span>`}
+      </div>`).join('');
+  }
+
+  async function loadVacancies() {
+    const vacancies = await api(`${base}/vacancies`);
+    $('kOpen').textContent = vacancies.filter((v) => v.status === 'open').length;
+    const applicants = await Promise.all(vacancies.map((v) =>
+      openApplicants.has(v.id) ? api(`/api/vacancies/${v.id}/applications`) : null));
+    $('vacancies').innerHTML = vacancies.length ? vacancies.map((v, i) => `
+      <div class="item">
+        <div class="item-head">
+          <div><div class="item-title">${esc(v.title)}</div>
+            <div class="sub">${esc(v.game)} · ${esc(v.region)} · ${esc(titleCase(v.level))} · posted ${esc(fmtDate(v.postedAt))}</div></div>
+          <span class="status ${esc(v.status)}">${esc(v.status)}</span>
+        </div>
+        <div class="item-actions">
+          <button class="btn small" data-act="applicants" data-vacancy="${esc(v.id)}">
+            ${openApplicants.has(v.id) ? 'Hide' : 'View'} applicants (${v.applicationCount}${v.pendingCount ? `, ${v.pendingCount} pending` : ''})</button>
+          <button class="btn small" data-act="${v.status === 'open' ? 'close' : 'open'}" data-vacancy="${esc(v.id)}">${v.status === 'open' ? 'Close' : 'Reopen'}</button>
+        </div>
+        ${applicants[i] ? `<div class="applicants">${applicantRows(applicants[i])}</div>` : ''}
+      </div>`).join('') : '<div class="empty">No vacancies posted yet.</div>';
+  }
+
+  async function refresh() {
+    await Promise.all([loadRoster(), loadVacancies()]);
+  }
+
+  async function act(fn) {
+    try {
+      notice('');
+      await fn();
+      await refresh();
+    } catch (err) {
+      notice(err.message);
+    }
+  }
+
+  $('roster').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-act]');
+    if (!b) return;
+    const puuid = encodeURIComponent(b.dataset.puuid);
+    const member = roster.find((m) => m.playerPuuid === b.dataset.puuid);
+    if (b.dataset.act === 'toggle') {
+      act(() => api(`${base}/roster/${puuid}`, { method: 'PATCH', body: { status: member.status === 'active' ? 'bench' : 'active' } }));
+    } else if (b.dataset.act === 'remove' && confirm(`Remove ${member.player.riotId} from the roster?`)) {
+      act(() => api(`${base}/roster/${puuid}`, { method: 'DELETE' }));
+    }
+  });
+
+  $('vacancies').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-act]');
+    if (!b) return;
+    const { act: action, vacancy, app } = b.dataset;
+    if (action === 'applicants') {
+      openApplicants.has(vacancy) ? openApplicants.delete(vacancy) : openApplicants.add(vacancy);
+      act(async () => {});
+    } else if (action === 'close' || action === 'open') {
+      act(() => api(`/api/vacancies/${vacancy}`, { method: 'PATCH', body: { status: action === 'close' ? 'closed' : 'open' } }));
+    } else if (action === 'accept' || action === 'reject') {
+      b.disabled = true;
+      act(() => api(`/api/applications/${app}`, { method: 'PATCH', body: { status: action === 'accept' ? 'accepted' : 'rejected' } }));
+    }
+  });
+
+  $('addForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target));
+    const btn = e.target.querySelector('button');
+    btn.disabled = true;
+    setMsg($('addMsg'), `Loading ${f.riotId}'s verified profile…`);
+    try {
+      const profile = await loadPlayer(f.riotId.trim(), f.region);
+      await api(`${base}/roster`, { method: 'POST', body: { riotId: profile.riotId, region: profile.region, role: f.role, status: f.status } });
+      setMsg($('addMsg'), `Added ${profile.riotId}.`, 'ok');
+      e.target.reset();
+      await loadRoster();
+    } catch (err) {
+      setMsg($('addMsg'), err.message, 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  $('vacancyForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target));
+    try {
+      await api(`${base}/vacancies`, { method: 'POST', body: f });
+      setMsg($('vacancyMsg'), `Posted "${f.title}".`, 'ok');
+      e.target.reset();
+      await loadVacancies();
+    } catch (err) {
+      setMsg($('vacancyMsg'), err.message, 'error');
+    }
+  });
+
+  (async () => {
+    try {
+      const org = await api(base);
+      $('orgName').textContent = org.name;
+      $('orgLogo').textContent = org.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+      document.title = `${org.name} · Veridium`;
+      await refresh();
+    } catch (err) {
+      $('orgName').textContent = 'Organization not found';
+      notice(`${err.message}. Run "npm run seed" to create Obscurity Esports.`);
+      $('roster').innerHTML = '<tr><td colspan="7" class="empty">—</td></tr>';
+      $('vacancies').innerHTML = '';
+    }
+  })();
+</script>
+</body>
+</html>

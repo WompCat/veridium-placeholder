@@ -1,7 +1,10 @@
 # Veridium
 
-Verified esports player profiles. This repo currently holds step 1 of the rebuild plan, the
-**TFT / Riot API ingestion pipeline** (`veridium-pipeline/`), plus a Player Profile page that reads from it.
+Verified esports player profiles. `veridium-pipeline/` holds:
+
+- **TFT / Riot API ingestion pipeline** (rebuild step 1) and the Player Profile page (`/`)
+- **Organization & vacancy backend** (rebuild steps 3–4): rosters, vacancy postings and applications,
+  with the Org Dashboard (`/org.html?id=obscurity-esports`) and Jobs page (`/jobs.html`)
 
 ## Quick start (Windows / PowerShell)
 
@@ -11,9 +14,11 @@ cd "C:\Users\Anthony\Projects\Veridium Placeholder\veridium-pipeline"
 git checkout claude/build-order-review-rbzbu7
 npm install
 copy .env.example .env      # then paste your RIOT_API_KEY into .env
+npm run seed                # creates the Obscurity Esports org record (safe to re-run)
 npm test                    # mocked Riot responses, no key needed
 npm run ingest -- "WompCat#NA1" na1   # one live ingestion run, prints the profile JSON
 npm run dev                 # http://localhost:4000/?riotId=WompCat%23NA1&region=na1
+                            # http://localhost:4000/org.html?id=obscurity-esports
 ```
 
 Riot development keys expire every 24 hours, so regenerate yours at
@@ -74,6 +79,7 @@ each tracked season, newest first, with its own stats and every match.
 | `src/tft/aggregate.ts` | `Matchup[]` + snapshots → profile stats |
 | `src/routes/players.ts`, `src/server.ts` | Express endpoint + static Player Profile page (`public/index.html`) |
 | `src/cli.ts` | `npm run ingest -- "Name#TAG" [region]` |
+| `migrations/` | numbered `.sql` files applied in order on startup (see below) |
 
 ### Notes on the numbers
 
@@ -84,3 +90,48 @@ each tracked season, newest first, with its own stats and every match.
   Otherwise the value is `null` and the UI shows "—". These fill in as the profile is loaded more often.
 - **Highest rank** is the highest snapshot Veridium has recorded, not the player's all-time peak.
 - **Percentile** is `null` because Riot doesn't provide one.
+
+## Organizations & vacancies
+
+Rosters, vacancies and applications live in the same sqlite file as the pipeline. They only ever
+store a `playerPuuid`. Verified stats are read from the pipeline's tables when a response is built,
+so an application's "resume" is always the player's live profile.
+
+The **player ↔ org loop**: an org posts a vacancy, a player applies with their Riot ID, and the org
+accepts or rejects. Accepting updates the application and adds the roster row in one transaction,
+so the roster and the application history can't disagree.
+
+| Endpoint | |
+| --- | --- |
+| `GET /api/organizations/:id` | org name and roster size |
+| `GET /api/organizations/:id/roster` | active then bench members, each with `player` stats |
+| `POST /api/organizations/:id/roster` | `{ playerPuuid \| riotId+region, role, status? }` |
+| `PATCH /api/organizations/:id/roster/:playerPuuid` | `{ role?, status? }` (`active` / `bench`) |
+| `DELETE /api/organizations/:id/roster/:playerPuuid` | sets `leftAt`; the row stays as roster history |
+| `GET /api/organizations/:id/vacancies` | the org's postings, with application counts |
+| `POST /api/organizations/:id/vacancies` | `{ title, game? = TFT, region? = NA, level? = competitive }` |
+| `PATCH /api/vacancies/:id` | `{ status: open \| closed }` (title/game/region/level also editable) |
+| `GET /api/vacancies?game=&region=&status=` | public listing; `status` defaults to `open`, or `closed` / `all` |
+| `POST /api/vacancies/:id/applications` | `{ playerPuuid \| riotId+region }` |
+| `GET /api/vacancies/:id/applications` | pending first, each with `player` stats |
+| `PATCH /api/applications/:id` | `{ status: accepted \| rejected, role?, rosterStatus? }` |
+
+Players must already be cached by the pipeline (their profile loaded once) before they can be
+rostered or apply. Otherwise the API returns 404. The Org Dashboard and Jobs pages load the
+profile first automatically. Errors use `400` (bad input), `404` (missing org/player/vacancy) and
+`409` (already on the roster, already applied, vacancy closed, application already decided).
+
+### Migrations
+
+`migrations/NNN_name.sql` files run in order the first time the store opens a database (server,
+CLI, seed or tests), and each is recorded in `schema_migrations`. `001_pipeline.sql` is the
+pipeline schema with `IF NOT EXISTS`, so databases from before migrations existed adopt it
+unchanged. To change the schema, add the next numbered file. Never edit one that has already shipped.
+
+### Open decisions
+
+- **Who can post vacancies / manage the roster.** There are no accounts yet, so every org endpoint
+  is open to anyone who can reach the server. Add auth before this is exposed beyond local use.
+- **Free vs paid vacancy postings.** There's no `plan` / `billingStatus` on `Organization` yet. Add
+  it in a new migration once that's decided.
+- **Obscurity Esports** is created by `npm run seed`, not by a migration, so it's easy to change or drop.
