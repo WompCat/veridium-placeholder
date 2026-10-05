@@ -43,16 +43,16 @@
           <div class="kpi"><b id="kOpen">–</b><span>Open roles</span></div>
         </div>
       </div>
-      <div class="tabs"><span>Overview</span><span class="on">Roster</span><span>Scrims</span><span>Vacancies</span><span>Settings</span></div>
+      <div class="tabs"><span>Overview</span><a class="on" href="#roster-panel">Roster</a><span>Scrims</span><a href="#vacancies-panel">Vacancies</a><span>Settings</span></div>
     </section>
 
-    <section class="card pad">
+    <section class="card pad" id="roster-panel">
       <div class="table-head">
         <div><h2>Roster</h2><div class="sub">Stats are verified from official Riot APIs and update as players are loaded.</div></div>
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Player</th><th>Role</th><th>Status</th><th>Rank</th><th>Win Rate</th><th>Joined</th><th></th></tr></thead>
+          <thead><tr><th>Player</th><th>Rank</th><th>Win Rate</th><th>Role</th><th>Status</th><th>Joined</th><th></th></tr></thead>
           <tbody id="roster"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
         </table>
       </div>
@@ -61,31 +61,39 @@
       <form class="form-row" id="addForm">
         <label class="field">Riot ID<input name="riotId" placeholder="Name#TAG" required /></label>
         <label class="field" style="flex:0 1 90px">Region<select name="region"></select></label>
-        <label class="field">Role<input name="role" placeholder="e.g. TFT, Flex, Sub" required maxlength="40" /></label>
+        <label class="field">Role<input name="role" placeholder="e.g. TFT, Flex, Sub" required maxlength="40" list="roleOptions" /></label>
         <label class="field" style="flex:0 1 110px">Status<select name="status"><option value="active">Active</option><option value="bench">Bench</option></select></label>
         <button class="btn primary">Add to roster</button>
       </form>
       <div class="form-msg" id="addMsg"></div>
     </section>
+
+    <section class="card pad" id="vacancies-panel">
+      <div class="table-head">
+        <div><h2>Vacancies</h2><div class="sub">Players apply with their verified profile. Applicants show live stats, not a form submission.</div></div>
+      </div>
+      <div class="list" id="vacancies"><div class="empty">Loading…</div></div>
+      <button class="expand" id="showClosed" aria-expanded="false" hidden></button>
+      <div class="list" id="closedVacancies" style="margin-top:12px" hidden></div>
+    </section>
   </div>
 
   <aside class="stack">
     <section class="card pad">
-      <h2>Vacancies</h2>
-      <div class="sub" style="margin-bottom:14px">Players apply with their verified profile.</div>
-      <div class="list" id="vacancies"><div class="empty">Loading…</div></div>
-      <hr class="divider" />
-      <h2 style="font-size:14px;margin-bottom:10px">Post a vacancy</h2>
+      <h2>Post a vacancy</h2>
+      <div class="sub" style="margin-bottom:14px">It appears on the Jobs page right away.</div>
       <form class="form-row" id="vacancyForm">
         <label class="field" style="flex-basis:100%">Title<input name="title" placeholder="e.g. Flex Player" required maxlength="80" /></label>
+        <label class="field" style="flex-basis:100%">Roster role<input name="role" placeholder="e.g. Flex, Sub, Coach (optional)" maxlength="40" list="roleOptions" /></label>
         <label class="field">Game<select name="game"><option>TFT</option><option>LoL</option><option>Valorant</option><option>Overwatch 2</option></select></label>
         <label class="field">Region<select name="region"><option>NA</option><option>EUW</option><option>EUNE</option><option>KR</option><option>BR</option><option>OCE</option></select></label>
-        <label class="field">Level<select name="level"><option value="competitive">Competitive</option><option value="casual">Casual</option></select></label>
+        <label class="field" style="flex-basis:100%">Level<select name="level"><option value="competitive">Competitive</option><option value="casual">Casual</option></select></label>
         <button class="btn primary" style="flex-basis:100%">Post vacancy</button>
       </form>
       <div class="form-msg" id="vacancyMsg"></div>
     </section>
   </aside>
+  <datalist id="roleOptions"><option>Player</option><option>Flex</option><option>Sub</option><option>Coach</option><option>Analyst</option><option>Manager</option></datalist>
 </main>
 
 <script src="common.js"></script>
@@ -93,7 +101,10 @@
   const orgId = new URLSearchParams(location.search).get('id') || 'obscurity-esports';
   const base = `/api/organizations/${encodeURIComponent(orgId)}`;
   const openApplicants = new Set(); // vacancy ids whose applicant list is expanded
+  let acceptingId = null; // application id showing the accept options row
+  let showClosed = false;
   let roster = [];
+  let vacancies = [];
 
   document.querySelector('#addForm select[name=region]').innerHTML = regionOptions();
 
@@ -102,10 +113,14 @@
     $('notice').textContent = text || '';
   }
 
-  function playerCell(p) {
-    return `<div class="who-cell"><span class="mini-avatar">${esc(p.riotId.charAt(0).toUpperCase())}</span>
-      <div><a href="${esc(profileUrl(p))}"><b>${esc(p.riotId.split('#')[0])}</b></a> <span class="verified" title="Verified">✔</span>
-      <div class="sub">#${esc(p.riotId.split('#')[1])} · ${esc(p.region.toUpperCase())}</div></div></div>`;
+  // The player columns shared by roster rows and applicant rows: Player, Rank, Win Rate.
+  function playerCells(p) {
+    return `
+      <td><div class="who-cell"><span class="mini-avatar">${esc(p.riotId.charAt(0).toUpperCase())}</span>
+        <div><a href="${esc(profileUrl(p))}"><b>${esc(p.riotId.split('#')[0])}</b></a> <span class="verified" title="Verified">✔</span>
+        <div class="sub">#${esc(p.riotId.split('#')[1])} · ${esc(p.region.toUpperCase())}</div></div></div></td>
+      <td>${esc(fmtRank(p.rank))}</td>
+      <td>${p.totalMatches ? pct(p.winRate) : '<span class="dim">—</span>'}</td>`;
   }
 
   function renderRoster() {
@@ -113,11 +128,9 @@
     $('kBench').textContent = roster.filter((m) => m.status === 'bench').length;
     $('roster').innerHTML = roster.length ? roster.map((m) => `
       <tr>
-        <td>${playerCell(m.player)}</td>
+        ${playerCells(m.player)}
         <td>${esc(m.role)}</td>
         <td><span class="status ${esc(m.status)}">${esc(m.status)}</span></td>
-        <td>${esc(fmtRank(m.player.rank))}</td>
-        <td>${m.player.totalMatches ? pct(m.player.winRate) : '<span class="dim">—</span>'}</td>
         <td>${esc(fmtDate(m.joinedAt))}</td>
         <td style="text-align:right">
           <button class="btn small" data-act="toggle" data-puuid="${esc(m.playerPuuid)}">${m.status === 'active' ? 'Bench' : 'Activate'}</button>
@@ -131,29 +144,50 @@
     renderRoster();
   }
 
-  function applicantRows(apps) {
-    if (!apps.length) return '<div class="sub">No applications yet.</div>';
-    return apps.map((a) => `
-      <div class="applicant">
-        <div>${playerCell(a.player)}
-          <div class="sub" style="margin:4px 0 0 40px">${esc(fmtRank(a.player.rank))} · ${a.player.totalMatches ? pct(a.player.winRate) + ' top-4' : 'no games this set'} · applied ${esc(fmtDate(a.appliedAt))}</div>
-        </div>
-        ${a.status === 'pending'
-          ? `<div style="display:flex;gap:6px"><button class="btn small good" data-act="accept" data-app="${esc(a.id)}">Accept</button>
-             <button class="btn small bad" data-act="reject" data-app="${esc(a.id)}">Reject</button></div>`
-          : `<span class="status ${esc(a.status)}">${esc(a.status)}</span>`}
-      </div>`).join('');
+  const defaultRole = (v) => v.role || v.title;
+
+  function applicantActions(a, v) {
+    if (a.status === 'pending') {
+      return `<button class="btn small good" data-act="accept" data-app="${esc(a.id)}">Accept</button>
+        <button class="btn small bad" data-act="reject" data-app="${esc(a.id)}">Reject</button>`;
+    }
+    if (a.status === 'accepted' && !a.onRoster) {
+      return `<button class="btn small primary" data-act="roster" data-app="${esc(a.id)}"
+        title="Adds them as ${esc(defaultRole(v))} (active)">Add to roster</button>`;
+    }
+    return a.status === 'accepted' ? '<span class="sub">On roster</span>' : '';
   }
 
-  async function loadVacancies() {
-    const vacancies = await api(`${base}/vacancies`);
-    $('kOpen').textContent = vacancies.filter((v) => v.status === 'open').length;
-    const applicants = await Promise.all(vacancies.map((v) =>
-      openApplicants.has(v.id) ? api(`/api/vacancies/${v.id}/applications`) : null));
-    $('vacancies').innerHTML = vacancies.length ? vacancies.map((v, i) => `
-      <div class="item">
+  // Accept options: role pre-filled from the vacancy, add to roster in the same step or later.
+  function acceptRow(a, v) {
+    return `<tr><td colspan="6" style="background:var(--accent-soft)">
+      <form class="form-row" data-accept="${esc(a.id)}">
+        <label class="field">Roster role<input name="role" value="${esc(defaultRole(v))}" maxlength="40" list="roleOptions" required /></label>
+        <label class="field" style="flex:0 1 110px">Status<select name="status"><option value="active">Active</option><option value="bench">Bench</option></select></label>
+        <button class="btn primary" name="add" value="1">Accept &amp; add to roster</button>
+        <button class="btn" name="add" value="0">Accept only</button>
+        <button class="btn" type="button" data-act="cancel">Cancel</button>
+      </form></td></tr>`;
+  }
+
+  function applicantsTable(apps, v) {
+    if (!apps.length) return '<div class="sub">No applications yet.</div>';
+    return `<div class="table-wrap"><table>
+      <thead><tr><th>Player</th><th>Rank</th><th>Win Rate</th><th>Applied</th><th>Status</th><th></th></tr></thead>
+      <tbody>${apps.map((a) => `
+        <tr>
+          ${playerCells(a.player)}
+          <td>${esc(fmtDate(a.appliedAt))}</td>
+          <td><span class="status ${esc(a.status)}">${esc(a.status)}</span></td>
+          <td style="text-align:right">${applicantActions(a, v)}</td>
+        </tr>${acceptingId === a.id ? acceptRow(a, v) : ''}`).join('')}</tbody></table></div>`;
+  }
+
+  function vacancyCard(v, applicants) {
+    return `
+      <div class="item" ${v.status === 'closed' ? 'style="opacity:.75"' : ''}>
         <div class="item-head">
-          <div><div class="item-title">${esc(v.title)}</div>
+          <div><div class="item-title">${esc(v.title)}${v.role ? ` <span class="pill">${esc(v.role)}</span>` : ''}</div>
             <div class="sub">${esc(v.game)} · ${esc(v.region)} · ${esc(titleCase(v.level))} · posted ${esc(fmtDate(v.postedAt))}</div></div>
           <span class="status ${esc(v.status)}">${esc(v.status)}</span>
         </div>
@@ -162,8 +196,26 @@
             ${openApplicants.has(v.id) ? 'Hide' : 'View'} applicants (${v.applicationCount}${v.pendingCount ? `, ${v.pendingCount} pending` : ''})</button>
           <button class="btn small" data-act="${v.status === 'open' ? 'close' : 'open'}" data-vacancy="${esc(v.id)}">${v.status === 'open' ? 'Close' : 'Reopen'}</button>
         </div>
-        ${applicants[i] ? `<div class="applicants">${applicantRows(applicants[i])}</div>` : ''}
-      </div>`).join('') : '<div class="empty">No vacancies posted yet.</div>';
+        ${applicants ? `<div class="applicants">${applicantsTable(applicants, v)}</div>` : ''}
+      </div>`;
+  }
+
+  async function loadVacancies() {
+    vacancies = await api(`${base}/vacancies`); // newest first
+    const applicants = Object.fromEntries(await Promise.all(vacancies
+      .filter((v) => openApplicants.has(v.id))
+      .map(async (v) => [v.id, await api(`/api/vacancies/${v.id}/applications`)])));
+    const open = vacancies.filter((v) => v.status === 'open');
+    const closed = vacancies.filter((v) => v.status === 'closed');
+    $('kOpen').textContent = open.length;
+    $('vacancies').innerHTML = open.length
+      ? open.map((v) => vacancyCard(v, applicants[v.id])).join('')
+      : '<div class="empty">No open vacancies. Post one to start taking applications.</div>';
+    $('showClosed').hidden = !closed.length;
+    $('showClosed').setAttribute('aria-expanded', String(showClosed));
+    $('showClosed').innerHTML = `${showClosed ? 'Hide' : 'Show'} closed vacancies (${closed.length}) <span class="chev">▾</span>`;
+    $('closedVacancies').hidden = !showClosed || !closed.length;
+    $('closedVacancies').innerHTML = closed.map((v) => vacancyCard(v, applicants[v.id])).join('');
   }
 
   async function refresh() {
@@ -192,7 +244,7 @@
     }
   });
 
-  $('vacancies').addEventListener('click', (e) => {
+  function onVacancyClick(e) {
     const b = e.target.closest('button[data-act]');
     if (!b) return;
     const { act: action, vacancy, app } = b.dataset;
@@ -201,10 +253,42 @@
       act(async () => {});
     } else if (action === 'close' || action === 'open') {
       act(() => api(`/api/vacancies/${vacancy}`, { method: 'PATCH', body: { status: action === 'close' ? 'closed' : 'open' } }));
-    } else if (action === 'accept' || action === 'reject') {
+    } else if (action === 'accept') {
+      acceptingId = app;
+      act(async () => {});
+    } else if (action === 'cancel') {
+      acceptingId = null;
+      act(async () => {});
+    } else if (action === 'reject') {
       b.disabled = true;
-      act(() => api(`/api/applications/${app}`, { method: 'PATCH', body: { status: action === 'accept' ? 'accepted' : 'rejected' } }));
+      act(() => api(`/api/applications/${app}`, { method: 'PATCH', body: { status: 'rejected' } }));
+    } else if (action === 'roster') {
+      b.disabled = true;
+      act(() => api(`/api/applications/${app}/roster`, { method: 'POST', body: {} }));
     }
+  }
+
+  function onAcceptSubmit(e) {
+    const form = e.target.closest('form[data-accept]');
+    if (!form) return;
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(form));
+    const addToRoster = e.submitter?.value !== '0';
+    acceptingId = null;
+    act(() => api(`/api/applications/${form.dataset.accept}`, {
+      method: 'PATCH',
+      body: { status: 'accepted', addToRoster, ...(addToRoster && { role: f.role, rosterStatus: f.status }) },
+    }));
+  }
+
+  for (const list of [$('vacancies'), $('closedVacancies')]) {
+    list.addEventListener('click', onVacancyClick);
+    list.addEventListener('submit', onAcceptSubmit);
+  }
+
+  $('showClosed').addEventListener('click', () => {
+    showClosed = !showClosed;
+    act(async () => {});
   });
 
   $('addForm').addEventListener('submit', async (e) => {
@@ -228,7 +312,7 @@
 
   $('vacancyForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const f = Object.fromEntries(new FormData(e.target));
+    const f = Object.fromEntries(Object.entries(Object.fromEntries(new FormData(e.target))).filter(([, v]) => v));
     try {
       await api(`${base}/vacancies`, { method: 'POST', body: f });
       setMsg($('vacancyMsg'), `Posted "${f.title}".`, 'ok');

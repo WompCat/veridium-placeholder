@@ -5,7 +5,13 @@ import { Store } from './cache/store';
 import { config } from './config';
 import { RiotClient } from './riot/client';
 import { OrgRepo } from './orgs/repo';
-import { applicationsRouter, errorHandler, organizationsRouter, vacanciesRouter } from './routes/organizations';
+import {
+  applicationsRouter,
+  errorHandler,
+  organizationsRouter,
+  playerApplicationsRouter,
+  vacanciesRouter,
+} from './routes/organizations';
 import { playersRouter } from './routes/players';
 import type { IngestDeps } from './tft/ingest';
 
@@ -16,6 +22,7 @@ export function createApp(deps: IngestDeps, orgs = new OrgRepo(deps.store.db)) {
   app.use(express.json());
   app.use('/api/players', playersRouter(deps));
   const orgDeps = { ...deps, orgs };
+  app.use('/api/players', playerApplicationsRouter(orgDeps));
   app.use('/api/organizations', organizationsRouter(orgDeps));
   app.use('/api/vacancies', vacanciesRouter(orgDeps));
   app.use('/api/applications', applicationsRouter(orgDeps));

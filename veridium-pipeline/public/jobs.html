@@ -34,6 +34,7 @@
       <form class="form-row" id="filters">
         <label class="field">Game<select name="game"><option value="">All games</option><option>TFT</option><option>LoL</option><option>Valorant</option><option>Overwatch 2</option></select></label>
         <label class="field">Region<select name="region"><option value="">All regions</option><option>NA</option><option>EUW</option><option>EUNE</option><option>KR</option><option>BR</option><option>OCE</option></select></label>
+        <label class="field">Role<select name="role"><option value="">All roles</option></select></label>
       </form>
     </section>
     <section class="list" id="list"><div class="card pad empty">Loading…</div></section>
@@ -47,6 +48,7 @@
         <div><span>2. Veridium loads your verified stats from Riot</span></div>
         <div><span>3. The org sees your live profile, not a self-reported resume</span></div>
       </div>
+      <div id="myApps" class="sub" style="margin-top:14px"></div>
     </section>
   </aside>
 </main>
@@ -54,6 +56,31 @@
 <script src="common.js"></script>
 <script>
   let openForm = null; // vacancy id with the apply form showing
+  const ME_KEY = 'veridium.lastRiotId';
+
+  // Remember the last Riot ID used to apply, to pre-fill the next application (this browser only).
+  function rememberedPlayer() {
+    try { return JSON.parse(localStorage.getItem(ME_KEY)) || null; } catch { return null; }
+  }
+  function rememberPlayer(riotId, region) {
+    try { localStorage.setItem(ME_KEY, JSON.stringify({ riotId, region })); } catch {}
+    renderMyApps();
+  }
+  function renderMyApps() {
+    const me = rememberedPlayer();
+    $('myApps').innerHTML = me
+      ? `Track the status of your applications on <a href="${esc(profileUrl(me))}#applications">${esc(me.riotId)}'s profile</a>.`
+      : '';
+  }
+
+  // Role options come from what's actually open, so the filter never offers an empty result.
+  async function loadRoleOptions() {
+    try {
+      const roles = [...new Set((await api('/api/vacancies')).map((v) => v.role).filter(Boolean))].sort();
+      document.querySelector('#filters select[name=role]').innerHTML =
+        '<option value="">All roles</option>' + roles.map((r) => `<option>${esc(r)}</option>`).join('');
+    } catch {}
+  }
 
   async function loadList() {
     const f = Object.fromEntries(new FormData($('filters')));
@@ -65,7 +92,7 @@
           <div class="item-head">
             <div class="who-cell">
               <span class="org-chip">${esc(v.organizationName.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase())}</span>
-              <div><div class="item-title">${esc(v.title)}</div>
+              <div><div class="item-title">${esc(v.title)}${v.role ? ` <span class="pill">${esc(v.role)}</span>` : ''}</div>
                 <div class="sub"><a href="org.html?id=${encodeURIComponent(v.organizationId)}">${esc(v.organizationName)}</a> · ${esc(v.game)} · ${esc(v.region)} · ${esc(titleCase(v.level))}</div></div>
             </div>
             <div style="text-align:right"><span class="sub">Posted ${esc(fmtDate(v.postedAt))}</span><br>
@@ -73,8 +100,8 @@
           </div>
           ${openForm === v.id ? `
           <form class="apply-form form-row" data-vacancy="${esc(v.id)}">
-            <label class="field">Your Riot ID<input name="riotId" placeholder="Name#TAG" required /></label>
-            <label class="field" style="flex:0 1 90px">Region<select name="region">${regionOptions()}</select></label>
+            <label class="field">Your Riot ID<input name="riotId" placeholder="Name#TAG" required value="${esc(rememberedPlayer()?.riotId ?? '')}" /></label>
+            <label class="field" style="flex:0 1 90px">Region<select name="region">${regionOptions(rememberedPlayer()?.region)}</select></label>
             <button class="btn primary">Submit application</button>
           </form>
           <div class="form-msg" data-msg="${esc(v.id)}"></div>` : ''}
@@ -85,6 +112,7 @@
   }
 
   $('filters').addEventListener('change', loadList);
+
 
   $('list').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-apply]');
@@ -107,7 +135,10 @@
       await api(`/api/vacancies/${encodeURIComponent(id)}/applications`, {
         method: 'POST', body: { riotId: profile.riotId, region: profile.region },
       });
-      setMsg(msg, `Applied as ${profile.riotId}. The org will see your verified profile.`, 'ok');
+      msg.innerHTML = `<span class="ok">Applied as ${esc(profile.riotId)}. The org sees your verified profile.</span>
+        <a href="${esc(profileUrl(profile))}#applications">Track your application</a>`;
+      msg.className = 'form-msg ok';
+      rememberPlayer(profile.riotId, profile.region);
       openForm = null;
       form.remove();
     } catch (err) {
@@ -116,6 +147,8 @@
     }
   });
 
+  renderMyApps();
+  loadRoleOptions();
   loadList();
 </script>
 </body>

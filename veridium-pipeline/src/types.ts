@@ -54,6 +54,7 @@ export interface Vacancy {
   title: string;
   game: string;
   region: string;
+  role: string | null; // the roster role this is for; pre-fills the roster entry on accept
   level: VacancyLevel;
   status: VacancyStatus;
   postedAt: string;
@@ -95,6 +96,15 @@ export interface VacancyListing extends Vacancy {
 
 export interface ApplicationView extends Application {
   player: PlayerSummary;
+  onRoster: boolean; // currently on the vacancy's org roster (an accepted applicant may not be added yet)
+}
+
+/** A player's own application, with the vacancy and org it's for. */
+export interface PlayerApplication extends Application {
+  vacancy: Pick<Vacancy, 'title' | 'game' | 'region' | 'role' | 'level' | 'status'>;
+  organizationId: string;
+  organizationName: string;
+  onRoster: boolean;
 }
 
 export interface Tournament {

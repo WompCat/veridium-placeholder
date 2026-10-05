@@ -97,9 +97,13 @@ Rosters, vacancies and applications live in the same sqlite file as the pipeline
 store a `playerPuuid`. Verified stats are read from the pipeline's tables when a response is built,
 so an application's "resume" is always the player's live profile.
 
-The **player ↔ org loop**: an org posts a vacancy, a player applies with their Riot ID, and the org
-accepts or rejects. Accepting updates the application and adds the roster row in one transaction,
-so the roster and the application history can't disagree.
+The **player ↔ org loop**: an org posts a vacancy, and a player applies from the Jobs page or with
+one click from their profile. There are no stat fields to fill in, because the org sees their
+verified profile. The org reviews applicants in a table with the same Rank / Win Rate columns as
+the roster, then accepts or rejects. "Accept & add to roster" updates the application and adds the
+roster row in one transaction, so they can't disagree. "Accept only" leaves an **Add to roster**
+button, pre-filled with the vacancy's role, for later. Players see each application's status on
+their profile.
 
 | Endpoint | |
 | --- | --- |
@@ -109,16 +113,23 @@ so the roster and the application history can't disagree.
 | `PATCH /api/organizations/:id/roster/:playerPuuid` | `{ role?, status? }` (`active` / `bench`) |
 | `DELETE /api/organizations/:id/roster/:playerPuuid` | sets `leftAt`; the row stays as roster history |
 | `GET /api/organizations/:id/vacancies` | the org's postings, with application counts |
-| `POST /api/organizations/:id/vacancies` | `{ title, game? = TFT, region? = NA, level? = competitive }` |
-| `PATCH /api/vacancies/:id` | `{ status: open \| closed }` (title/game/region/level also editable) |
-| `GET /api/vacancies?game=&region=&status=` | public listing; `status` defaults to `open`, or `closed` / `all` |
+| `POST /api/organizations/:id/vacancies` | `{ title, role?, game? = TFT, region? = NA, level? = competitive }` |
+| `PATCH /api/vacancies/:id` | `{ status: open \| closed }` (title/role/game/region/level also editable) |
+| `GET /api/vacancies?game=&region=&role=&status=` | public listing, newest first; `status` defaults to `open`, or `closed` / `all` |
 | `POST /api/vacancies/:id/applications` | `{ playerPuuid \| riotId+region }` |
-| `GET /api/vacancies/:id/applications` | pending first, each with `player` stats |
-| `PATCH /api/applications/:id` | `{ status: accepted \| rejected, role?, rosterStatus? }` |
+| `GET /api/vacancies/:id/applications` | pending first, each with `player` stats and `onRoster` |
+| `PATCH /api/applications/:id` | `{ status: accepted \| rejected, addToRoster? = true, role?, rosterStatus? }` |
+| `POST /api/applications/:id/roster` | add an accepted applicant: `{ role? = vacancy role or title, status? = active }` |
+| `GET /api/players/:region/:riotId/applications` | a player's own applications with vacancy, org and status |
 
 Players must already be cached by the pipeline (their profile loaded once) before they can be
 rostered or apply. Otherwise the API returns 404. The Org Dashboard and Jobs pages load the
-profile first automatically. Errors use `400` (bad input), `404` (missing org/player/vacancy) and
+profile first automatically. If Riot can't be reached (for example, an expired dev key), the pages
+fall back to the cached profile, so players who are already cached still work.
+
+Applications are stored by PUUID, Riot's permanent account ID, but the API accepts a Riot ID +
+region. Riot IDs can be renamed, while a PUUID never changes, so a renamed player keeps their
+application history. Errors use `400` (bad input), `404` (missing org/player/vacancy) and
 `409` (already on the roster, already applied, vacancy closed, application already decided).
 
 ### Migrations

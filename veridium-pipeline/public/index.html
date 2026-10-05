@@ -103,6 +103,16 @@
         <div><span>Region</span><span id="regionText">–</span></div>
       </div>
     </section>
+    <section class="card pad" id="applications" hidden>
+      <h2>Applications</h2>
+      <div class="sub">Where this player has applied, and what the org decided.</div>
+      <div class="list" id="appList" style="margin-top:12px"></div>
+    </section>
+    <section class="card pad" id="openings" hidden>
+      <div class="table-head" style="margin-bottom:4px"><h2>Open Vacancies</h2><a href="jobs.html" class="sub">See all</a></div>
+      <div class="sub">Apply with this verified profile. No forms, the org sees these stats.</div>
+      <div class="list" id="openingList" style="margin-top:12px"></div>
+    </section>
   </aside>
 </main>
 
@@ -243,6 +253,78 @@
     renderMatches();
   }
 
+  // ---- Vacancies & applications (no accounts yet: applications are made as the profile shown) ----
+  const OPENINGS_SHOWN = 4;
+  const isoDate = (iso) => fmtDate(iso.slice(0, 10));
+  const jsonOrThrow = async (res) => {
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+  };
+
+  async function loadOrgCards(riotId, region) {
+    const playerPath = `/api/players/${encodeURIComponent(region)}/${encodeURIComponent(riotId)}`;
+    try {
+      const [apps, openings] = await Promise.all([
+        fetch(`${playerPath}/applications`).then(jsonOrThrow),
+        fetch('/api/vacancies').then(jsonOrThrow),
+      ]);
+      renderApplications(apps);
+      renderOpenings(openings, apps, riotId, region);
+    } catch {
+      $('applications').hidden = $('openings').hidden = true;
+    }
+  }
+
+  function renderApplications(apps) {
+    $('applications').hidden = !apps.length;
+    $('appList').innerHTML = apps.map((a) => {
+      const note = a.status === 'accepted'
+        ? (a.onRoster ? 'Accepted · on the roster' : 'Accepted · the org will add you to the roster')
+        : a.status === 'rejected' ? 'Not selected this time' : 'Waiting for the org to review';
+      return `<div class="item">
+        <div class="item-head">
+          <div><div class="item-title">${esc(a.vacancy.title)}</div>
+            <div class="sub"><a href="org.html?id=${encodeURIComponent(a.organizationId)}">${esc(a.organizationName)}</a> · applied ${esc(isoDate(a.appliedAt))}</div></div>
+          <span class="status ${esc(a.status)}">${esc(a.status)}</span>
+        </div>
+        <div class="sub" style="margin-top:6px">${esc(note)}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function renderOpenings(openings, apps, riotId, region) {
+    const applied = new Map(apps.map((a) => [a.vacancyId, a.status]));
+    const shown = openings.slice(0, OPENINGS_SHOWN);
+    $('openings').hidden = !shown.length;
+    $('openingList').innerHTML = shown.map((v) => `
+      <div class="item">
+        <div class="item-head">
+          <div><div class="item-title">${esc(v.title)}${v.role ? ` <span class="pill">${esc(v.role)}</span>` : ''}</div>
+            <div class="sub">${esc(v.organizationName)} · ${esc(v.game)} · ${esc(v.region)}</div></div>
+          ${applied.has(v.id)
+            ? `<span class="status ${esc(applied.get(v.id))}">${esc(applied.get(v.id) === 'pending' ? 'applied' : applied.get(v.id))}</span>`
+            : `<button class="btn small primary" data-apply="${esc(v.id)}">Apply</button>`}
+        </div>
+      </div>`).join('');
+    $('openingList').onclick = async (e) => {
+      const b = e.target.closest('button[data-apply]');
+      if (!b) return;
+      b.disabled = true;
+      try {
+        await fetch(`/api/vacancies/${encodeURIComponent(b.dataset.apply)}/applications`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ riotId, region }),
+        }).then(jsonOrThrow);
+        await loadOrgCards(riotId, region);
+      } catch (err) {
+        notice(err.message, 'error');
+        b.disabled = false;
+      }
+    };
+  }
+
   function notice(text, kind) {
     const n = $('notice');
     n.hidden = !text;
@@ -288,13 +370,26 @@
     history.replaceState(null, '', url);
     $('app').classList.add('loading');
     try {
-      const res = await fetch(`/api/players/${encodeURIComponent(region)}/${encodeURIComponent(riotId)}/profile`);
+      const profilePath = `/api/players/${encodeURIComponent(region)}/${encodeURIComponent(riotId)}/profile`;
+      const res = await fetch(profilePath);
       const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw Object.assign(new Error(body.error || `HTTP ${res.status}`), { api: true });
+      if (!res.ok) {
+        // Riot unreachable (e.g. expired dev key): fall back to the cached profile if there is one.
+        const cached = res.status >= 500 ? await fetch(`${profilePath}?cached=1`).catch(() => null) : null;
+        if (!cached?.ok) throw Object.assign(new Error(body.error || `HTTP ${res.status}`), { api: true });
+        const cachedBody = await cached.json();
+        view.set = cachedBody.currentSet;
+        view.expanded = false;
+        render(cachedBody);
+        notice(`Showing cached stats. Couldn't refresh from Riot: ${body.error || `HTTP ${res.status}`}`, 'info');
+        loadOrgCards(cachedBody.riotId, cachedBody.region);
+        return;
+      }
       view.set = body.currentSet;
       view.expanded = false;
       render(body);
       historyNotice(body);
+      loadOrgCards(body.riotId, body.region);
       if (body.history.syncing) pollHistory(riotId, region);
     } catch (err) {
       if (err.api) {
