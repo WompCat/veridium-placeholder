@@ -29,10 +29,20 @@ async function api(path, options = {}) {
 
 /**
  * Make sure the pipeline has this player's verified profile cached (fetching from Riot if needed),
- * so org and application endpoints can reference them.
+ * so org and application endpoints can reference them. If Riot can't be reached (e.g. an expired
+ * dev key), a player who's already cached still works.
  */
 async function loadPlayer(riotId, region) {
-  return api(`/api/players/${encodeURIComponent(region)}/${encodeURIComponent(riotId)}/profile`);
+  const path = `/api/players/${encodeURIComponent(region)}/${encodeURIComponent(riotId)}/profile`;
+  try {
+    return await api(path);
+  } catch (err) {
+    try {
+      return await api(`${path}?cached=1`);
+    } catch {
+      throw err;
+    }
+  }
 }
 
 function setMsg(el, text, kind) {
@@ -41,4 +51,4 @@ function setMsg(el, text, kind) {
 }
 
 const REGIONS = ['na1', 'euw1', 'eun1', 'kr', 'br1', 'la1', 'la2', 'oc1', 'jp1', 'tr1'];
-const regionOptions = () => REGIONS.map((r) => `<option>${r}</option>`).join('');
+const regionOptions = (selected) => REGIONS.map((r) => `<option${r === selected ? ' selected' : ''}>${r}</option>`).join('');

@@ -41,6 +41,13 @@ function oneOf<T extends string>(b: Body, key: string, allowed: T[], required = 
   return value as T;
 }
 
+function flag(b: Body, key: string): boolean | undefined {
+  const value = b[key];
+  if (value === undefined) return undefined;
+  if (typeof value !== 'boolean') throw badRequest(`"${key}" must be true or false`);
+  return value;
+}
+
 /** A player by `playerPuuid`, or by `riotId` (+ `region`, default na1) among players the pipeline has cached. */
 function resolvePlayer(deps: OrgDeps, b: Body): string {
   const puuid = text(b, 'playerPuuid', { max: 100 });
@@ -131,6 +138,7 @@ export function organizationsRouter(deps: OrgDeps): Router {
       title: text(b, 'title', { required: true, max: 80 }),
       game: text(b, 'game', { max: 40 }) ?? 'TFT',
       region: (text(b, 'region', { max: 10 }) ?? 'NA').toUpperCase(),
+      role: text(b, 'role', { max: 40 }) ?? null,
       level: oneOf(b, 'level', VACANCY_LEVELS) ?? 'competitive',
     };
     res.status(201).json(orgs.createVacancy(req.params.id, vacancy));
@@ -145,7 +153,7 @@ export function vacanciesRouter(deps: OrgDeps): Router {
   const { orgs } = deps;
   const router = Router();
 
-  // What a player browses: open postings across all orgs, filterable by game and region.
+  // What a player browses: open postings across all orgs, filterable by game, region and role.
   router.get('/', (req, res) => {
     const q = (key: string) => (typeof req.query[key] === 'string' && req.query[key] ? String(req.query[key]) : undefined);
     const status = q('status') ?? 'open';
@@ -157,6 +165,7 @@ export function vacanciesRouter(deps: OrgDeps): Router {
         status: status === 'all' ? undefined : (status as VacancyStatus),
         game: q('game'),
         region: q('region'),
+        role: q('role'),
       }),
     );
   });
@@ -167,6 +176,7 @@ export function vacanciesRouter(deps: OrgDeps): Router {
       title: text(b, 'title', { max: 80 }),
       game: text(b, 'game', { max: 40 }),
       region: text(b, 'region', { max: 10 })?.toUpperCase(),
+      role: text(b, 'role', { max: 40 }),
       level: oneOf(b, 'level', VACANCY_LEVELS),
       status: oneOf(b, 'status', VACANCY_STATUSES),
     };
@@ -184,14 +194,23 @@ export function vacanciesRouter(deps: OrgDeps): Router {
 
   router.get('/:id/applications', (req, res) => {
     const vacancy = orgs.requireVacancy(req.params.id);
-    res.json(orgs.listApplications(vacancy.id).map((a) => ({ ...a, player: summary(deps, a.playerPuuid) })));
+    res.json(
+      orgs.listApplications(vacancy.id).map((a) => ({
+        ...a,
+        player: summary(deps, a.playerPuuid),
+        onRoster: orgs.isOnRoster(a),
+      })),
+    );
   });
 
   router.use(errorHandler);
   return router;
 }
 
-/** /api/applications: accept or reject. Accepting adds the player to the roster in the same transaction. */
+/**
+ * /api/applications: accept or reject. Accepting adds the player to the roster in the same
+ * transaction unless `addToRoster: false`; POST /:id/roster adds an accepted applicant later.
+ */
 export function applicationsRouter(deps: OrgDeps): Router {
   const { orgs } = deps;
   const router = Router();
@@ -200,10 +219,35 @@ export function applicationsRouter(deps: OrgDeps): Router {
     const b = body(req);
     const decision = oneOf(b, 'status', ['accepted', 'rejected'], true)!;
     const result = orgs.decideApplication(req.params.id, decision, {
+      addToRoster: flag(b, 'addToRoster'),
       role: text(b, 'role', { max: 40 }),
       status: oneOf(b, 'rosterStatus', MEMBERSHIP_STATUSES),
     });
     res.json(result);
+  });
+
+  // One click from the applicants view: roster entry pre-filled from the application and vacancy.
+  router.post('/:id/roster', (req, res) => {
+    const b = body(req);
+    const membership = orgs.addApplicantToRoster(req.params.id, {
+      role: text(b, 'role', { max: 40 }),
+      status: oneOf(b, 'status', MEMBERSHIP_STATUSES),
+    });
+    res.status(201).json({ ...membership, player: summary(deps, membership.playerPuuid) });
+  });
+
+  router.use(errorHandler);
+  return router;
+}
+
+/** /api/players/:region/:riotId/applications: a player's own applications and their status (cache only). */
+export function playerApplicationsRouter(deps: OrgDeps): Router {
+  const router = Router();
+
+  router.get('/:region/:riotId/applications', (req, res) => {
+    const { gameName, tagLine } = parseRiotId(req.params.riotId);
+    const player = deps.store.findPlayer(gameName, tagLine, req.params.region);
+    res.json(player ? deps.orgs.listPlayerApplications(player.puuid) : []);
   });
 
   router.use(errorHandler);

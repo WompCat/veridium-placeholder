@@ -55,7 +55,11 @@ describe('migrations', () => {
     new Store(file).close();
     const reopened = new Store(file);
     const versions = reopened.db.prepare('SELECT version FROM schema_migrations ORDER BY version').all();
-    expect(versions).toEqual([{ version: '001_pipeline.sql' }, { version: '002_organizations.sql' }]);
+    expect(versions).toEqual([
+      { version: '001_pipeline.sql' },
+      { version: '002_organizations.sql' },
+      { version: '003_vacancy_roles.sql' },
+    ]);
     const tables = reopened.db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`).all();
     expect(tables.map((t: any) => t.name)).toEqual(
       expect.arrayContaining(['organizations', 'org_memberships', 'vacancies', 'applications']),
@@ -144,6 +148,19 @@ describe('vacancies', () => {
     expect((await api().get('/api/vacancies')).body).toHaveLength(1);
   });
 
+  it('stores the roster role and filters the public listing by it', async () => {
+    const flex = await postVacancy({ role: 'Flex' });
+    await postVacancy({ title: 'Head Coach', role: 'Coach' });
+    await postVacancy({ title: 'Open Tryouts' }); // no role
+    expect(flex).toMatchObject({ role: 'Flex' });
+
+    expect((await api().get('/api/vacancies?role=flex')).body.map((v: any) => v.id)).toEqual([flex.id]);
+    expect((await api().get('/api/vacancies')).body.map((v: any) => v.role)).toEqual([null, 'Coach', 'Flex']);
+
+    const edited = await api().patch(`/api/vacancies/${flex.id}`).send({ role: 'Sub' });
+    expect(edited.body.role).toBe('Sub');
+  });
+
   it('validates input', async () => {
     expect((await api().post(`/api/organizations/${ORG}/vacancies`).send({})).status).toBe(400);
     expect((await api().post(`/api/organizations/${ORG}/vacancies`).send({ title: 'X', level: 'pro' })).status).toBe(400);
@@ -201,6 +218,50 @@ describe('applications: the player ↔ org loop', () => {
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ application: { status: 'rejected' }, membership: null });
     expect(await roster()).toEqual(before);
+  });
+
+  it('can accept without rostering, then add the applicant in one click, pre-filled from the vacancy', async () => {
+    const v = await postVacancy({ role: 'Flex' });
+    const appId = (await apply(v.id)).body.id;
+
+    const accepted = await api().patch(`/api/applications/${appId}`).send({ status: 'accepted', addToRoster: false });
+    expect(accepted.body).toMatchObject({ application: { status: 'accepted' }, membership: null });
+    expect(await roster()).toEqual([]);
+    expect((await api().get(`/api/vacancies/${v.id}/applications`)).body[0]).toMatchObject({
+      status: 'accepted',
+      onRoster: false,
+    });
+
+    const added = await api().post(`/api/applications/${appId}/roster`).send({});
+    expect(added.status).toBe(201);
+    expect(added.body).toMatchObject({ playerPuuid: PUUID, role: 'Flex', status: 'active', player: { riotId: 'WompCat#NA1' } });
+    expect((await api().get(`/api/vacancies/${v.id}/applications`)).body[0].onRoster).toBe(true);
+    expect((await api().post(`/api/applications/${appId}/roster`).send({})).status).toBe(409); // already rostered
+  });
+
+  it("only adds accepted applicants to the roster, and rejects a non-boolean addToRoster", async () => {
+    const v = await postVacancy();
+    const appId = (await apply(v.id)).body.id;
+    expect((await api().post(`/api/applications/${appId}/roster`).send({})).status).toBe(409); // still pending
+    expect((await api().patch(`/api/applications/${appId}`).send({ status: 'accepted', addToRoster: 'no' })).status).toBe(400);
+    await api().patch(`/api/applications/${appId}`).send({ status: 'rejected' });
+    expect((await api().post(`/api/applications/${appId}/roster`).send({})).status).toBe(409);
+    expect((await api().post('/api/applications/missing/roster').send({})).status).toBe(404);
+  });
+
+  it("lists a player's own applications and their status", async () => {
+    const flex = await postVacancy({ role: 'Flex' });
+    const coach = await postVacancy({ title: 'Coach' });
+    const a1 = (await apply(flex.id)).body.id;
+    await apply(coach.id);
+    await api().patch(`/api/applications/${a1}`).send({ status: 'accepted' });
+
+    const mine = (await api().get('/api/players/na1/wompcat%23na1/applications')).body;
+    expect(mine.map((a: any) => [a.vacancy.title, a.status, a.onRoster, a.organizationName])).toEqual([
+      ['Coach', 'pending', true, 'Obscurity Esports'], // on the roster via the other application
+      ['Flex Player', 'accepted', true, 'Obscurity Esports'],
+    ]);
+    expect((await api().get('/api/players/na1/Nobody%23NA1/applications')).body).toEqual([]);
   });
 
   it('rolls the application back if the roster insert fails', async () => {
