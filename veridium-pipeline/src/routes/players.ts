@@ -38,7 +38,7 @@ export function playersRouter(deps: IngestDeps): Router {
     } catch (err) {
       if (err instanceof RiotApiError) {
         if (err.status === 404) {
-          res.status(404).json({ error: 'Player not found' });
+          res.status(404).json({ error: "No Riot account found for that Riot ID. Check the name, #tag and region." });
           return;
         }
         if (err.status === 401 || err.status === 403) {

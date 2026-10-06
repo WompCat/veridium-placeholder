@@ -62,7 +62,9 @@
       </nav>
       ${me
         ? `<a class="me-chip" href="${playerHref(me.riotId, me.region)}" title="My profile: ${escape(me.riotId)}"><span class="mini-avatar">${escape(me.riotId.charAt(0).toUpperCase())}</span></a>`
-        : `<a class="me-chip setup" href="/#me">Set up profile</a>`}`;
+        : page === 'landing'
+          ? `<div class="header-ctas"><a class="btn" href="organizations.html">Looking to hire?</a><a class="btn primary" href="#create">Create profile</a></div>`
+          : `<a class="me-chip setup" href="/#me">Set up profile</a>`}`;
     document.getElementById('siteSearch').addEventListener('submit', (e) => {
       e.preventDefault();
       const term = e.target.q.value.trim();

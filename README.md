@@ -100,7 +100,8 @@ searches the directory.
 
 | Page | |
 | --- | --- |
-| `/` Home | your profile card, an activity feed, open vacancies, players, games |
+| `/welcome.html` Landing | the public landing page; "Create Your Profile" takes a Riot ID. First-time visitors to `/` are sent here |
+| `/` Home | your profile card, an activity feed, open vacancies, players, games (once a profile is set on this device) |
 | `/players.html` | directory of verified players (+ matching orgs), and lookup by Riot ID |
 | `/player.html?riotId=…&region=…` | Player Profile: Overview, Games (season tabs), Matches, Tournaments, Stats, About |
 | `/organizations.html` | directory of organizations |

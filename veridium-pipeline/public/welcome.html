@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Veridium · Real Players. Real Stats. Real Opportunities.</title>
+<meta name="description" content="Verified esports player profiles built from official game APIs. For players, it's your career record. For organizations, it's the trusted source to scout, recruit, and build winning rosters." />
+<link rel="icon" href="data:," />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="app.css" />
+<style>
+  body { background: #fff; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 0 28px; }
+  section.block { padding: 64px 0; }
+  .kicker { color: var(--accent); font-weight: 700; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; }
+  h2.title { font-size: 30px; letter-spacing: -.01em; margin: 6px 0 8px; }
+  .lede { color: var(--muted); font-size: 16px; max-width: 620px; }
+
+  /* Hero */
+  .hero { background: radial-gradient(1200px 500px at 85% 20%, #e9e7ff 0, transparent 60%), linear-gradient(180deg, #f6f7ff, #fff); }
+  .hero .wrap { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: 48px; align-items: center; padding-top: 72px; padding-bottom: 72px; }
+  .hero h1 { font-size: clamp(34px, 4vw, 54px); line-height: 1.06; letter-spacing: -.02em; margin: 14px 0 18px; }
+  .hero h1 span { display: block; white-space: nowrap; }
+  .hero p { color: var(--muted); font-size: 17px; max-width: 540px; margin: 0 0 26px; }
+  .create { display: flex; gap: 10px; flex-wrap: wrap; max-width: 560px; }
+  .create input, .create select { border: 1px solid var(--border); background: #fff; border-radius: 12px; padding: 0 14px; height: 50px; font: inherit; font-size: 15px; }
+  .create input { flex: 1 1 220px; min-width: 0; }
+  .create .btn { height: 50px; padding: 0 22px; font-size: 15px; border-radius: 12px; }
+  .hero .alt { margin-top: 14px; font-size: 14px; color: var(--muted); }
+  .hero .alt a { font-weight: 600; }
+  .form-msg { min-height: 20px; }
+
+  /* Live preview card (a real verified player, not a stock photo) */
+  .stage { position: relative; min-height: 420px; border-radius: 24px; background: var(--banner); padding: 28px; display: grid; place-items: center; overflow: hidden; }
+  .stage::before { content: ""; position: absolute; inset: -40% -20% auto auto; width: 420px; height: 420px; border-radius: 50%; background: radial-gradient(circle, rgba(139,123,255,.55), transparent 65%); }
+  .preview { position: relative; width: min(100%, 380px); background: #fff; border-radius: 18px; box-shadow: 0 24px 60px rgba(8,10,40,.45); overflow: hidden; }
+  .preview .top { background: linear-gradient(120deg, #1c1f5a, #4a3bb8); color: #fff; padding: 18px; display: flex; gap: 14px; align-items: center; }
+  .preview .top .avatar { width: 58px; height: 58px; font-size: 22px; border-width: 3px; }
+  .preview .top b { font-size: 18px; display: flex; align-items: center; gap: 6px; }
+  .preview .body { padding: 16px 18px 18px; display: grid; gap: 14px; }
+  .preview .nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .preview .nums div { background: var(--bg); border-radius: 10px; padding: 10px; font-size: 11px; color: var(--muted); }
+  .preview .nums b { display: block; font-size: 17px; color: var(--text); }
+  .preview .live { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: var(--good); }
+  .preview .live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--good); }
+  .stage-tag { position: absolute; left: 22px; bottom: 18px; color: rgba(255,255,255,.75); font-size: 12px; }
+
+  /* Proof strip */
+  .proof { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .proof .wrap { display: flex; justify-content: space-around; gap: 20px; padding-top: 22px; padding-bottom: 22px; flex-wrap: wrap; text-align: center; }
+  .proof b { display: block; font-size: 26px; }
+  .proof span { color: var(--muted); font-size: 13px; }
+
+  /* Features */
+  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 28px; }
+  .feature { border: 1px solid var(--border); border-radius: 16px; padding: 24px; background: #fff; }
+  .feature .ico { width: 46px; height: 46px; border-radius: 12px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; margin-bottom: 14px; }
+  .feature .ico svg { width: 24px; height: 24px; }
+  .feature h3 { margin: 0 0 6px; font-size: 17px; }
+  .feature p { margin: 0; color: var(--muted); }
+
+  /* Titles */
+  .titles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 28px; }
+  .title-card { border: 1px solid var(--border); border-radius: 16px; padding: 20px; display: flex; gap: 14px; align-items: center; }
+  .title-card .game-icon { width: 48px; height: 48px; }
+  .title-card > div { text-align: left; min-width: 0; }
+  .title-card.soon { background: var(--bg); }
+  .title-card.soon .game-icon { background: #e1e4ef; color: var(--muted); }
+
+  /* How it works */
+  .how { background: var(--bg); }
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-top: 32px; counter-reset: step; }
+  .step { position: relative; text-align: center; padding: 0 8px; }
+  .step .ico { width: 64px; height: 64px; border-radius: 50%; background: #fff; border: 1px solid var(--border); color: var(--accent); display: grid; place-items: center; margin: 0 auto 14px; box-shadow: 0 6px 18px rgba(79,70,229,.12); }
+  .step .ico svg { width: 28px; height: 28px; }
+  .step:not(:last-child)::after { content: ""; position: absolute; top: 32px; left: calc(50% + 44px); right: calc(-50% + 44px); border-top: 2px dashed #c7cbff; }
+  .step h3 { margin: 0 0 6px; font-size: 16px; }
+  .step h3::before { counter-increment: step; content: counter(step) ". "; color: var(--accent); }
+  .step p { margin: 0; color: var(--muted); font-size: 13px; }
+
+  /* CTA + footer */
+  .cta-band { border-radius: 22px; background: radial-gradient(600px 300px at 90% 10%, rgba(139,123,255,.5), transparent 70%), var(--banner); color: #fff; padding: 44px; display: flex; justify-content: space-between; align-items: center; gap: 24px; flex-wrap: wrap; }
+  .cta-band h2 { font-size: 28px; margin: 0 0 8px; }
+  .cta-band p { margin: 0; opacity: .85; max-width: 560px; }
+  .cta-band .btn { background: #fff; color: var(--accent); border: 0; height: 48px; padding: 0 22px; font-size: 15px; }
+  footer.site { border-top: 1px solid var(--border); padding: 28px 0 36px; }
+  footer.site .wrap { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; align-items: flex-start; }
+  footer.site nav { display: flex; gap: 20px; flex-wrap: wrap; }
+  footer.site nav a { color: var(--muted); font-weight: 500; }
+  .legal { color: var(--muted); font-size: 12px; max-width: 760px; margin-top: 14px; }
+
+  @media (max-width: 960px) {
+    .hero .wrap { grid-template-columns: minmax(0, 1fr); padding-top: 44px; }
+    .features { grid-template-columns: minmax(0, 1fr); }
+    .titles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 32px; }
+    .step::after { display: none; }
+  }
+  @media (max-width: 560px) {
+    .wrap { padding: 0 16px; }
+    section.block { padding: 44px 0; }
+    .hero h1 { font-size: 34px; }
+    .titles, .steps { grid-template-columns: minmax(0, 1fr); }
+    .stage { min-height: 360px; padding: 18px; }
+    .cta-band { padding: 28px; }
+  }
+</style>
+</head>
+<body data-page="landing">
+<header id="site-header"></header>
+
+<!-- Hero -->
+<section class="hero" id="create">
+  <div class="wrap">
+    <div>
+      <div class="kicker">The verified esports profile platform</div>
+      <h1><span>Real Players.</span><span>Real Stats.</span><span>Real Opportunities.</span></h1>
+      <p>Verified player profiles with match data from official game APIs. For players, it's your career record. For organizations, it's the trusted source to scout, recruit, and build winning rosters.</p>
+      <form class="create" id="createForm">
+        <input name="riotId" placeholder="Your Riot ID, e.g. Name#TAG" aria-label="Riot ID" required />
+        <select name="region" aria-label="Region"></select>
+        <button class="btn primary">Create Your Profile</button>
+      </form>
+      <div class="form-msg" id="createMsg"></div>
+      <div class="alt">Looking to hire? <a href="organizations.html">Browse organizations</a> or <a href="players.html">scout verified players</a> →</div>
+    </div>
+    <div class="stage" aria-label="A live verified profile from Veridium">
+      <div class="preview" id="preview">
+        <div class="top"><span class="avatar">?</span><div><b>Loading…</b><span class="sub" style="color:rgba(255,255,255,.8)">Verified TFT profile</span></div></div>
+        <div class="body"><div class="nums"><div>Rank<b>–</b></div><div>Top-4<b>–</b></div><div>Avg. Place<b>–</b></div></div></div>
+      </div>
+      <div class="stage-tag" id="stageTag">Live from Riot's API</div>
+    </div>
+  </div>
+</section>
+
+<!-- Real numbers from this instance -->
+<section class="proof" aria-label="Veridium in numbers">
+  <div class="wrap">
+    <div><b id="nPlayers">–</b><span>verified players</span></div>
+    <div><b id="nMatches">–</b><span>verified matches this set</span></div>
+    <div><b id="nOrgs">–</b><span>organizations</span></div>
+    <div><b id="nRoles">–</b><span>open roles</span></div>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="block">
+  <div class="wrap">
+    <div class="kicker">Why Veridium</div>
+    <h2 class="title">A profile nobody can fake</h2>
+    <div class="lede">Every number comes straight from the game publisher. No screenshots, no self-reported ranks.</div>
+    <div class="features">
+      <div class="feature">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg></div>
+        <h3>Verified Stats</h3><p>Real match data from game APIs, not self-reported. Placements, ranks and history, straight from Riot.</p>
+      </div>
+      <div class="feature">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m20 20-5.5-5.5"/><path d="M7.5 12.5c.6-1.5 1.5-2.2 2.5-2.2s1.9.7 2.5 2.2"/><circle cx="10" cy="8" r="1.4"/></svg></div>
+        <h3>Talent Discovery</h3><p>Find and recruit players based on proven performance, then review applicants with their live stats.</p>
+      </div>
+      <div class="feature">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="3"/><circle cx="16.5" cy="9" r="2.5"/><path d="M2.5 20c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5M14 14.6c.8-.4 1.6-.6 2.5-.6 2.8 0 5 2 5 5"/></svg></div>
+        <h3>Roster Management</h3><p>Build, manage, and grow your team: active and bench players, roles, vacancies and applications in one place.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Supported titles -->
+<section class="block" style="padding-top:0">
+  <div class="wrap">
+    <div class="kicker">Supported titles</div>
+    <h2 class="title">Starting with Teamfight Tactics</h2>
+    <div class="lede">More titles are on the way.</div>
+    <div class="titles">
+      <div class="title-card"><span class="game-icon">TFT</span><div><b>Teamfight Tactics</b><div class="sub">Riot API · <span style="color:var(--good);font-weight:600">Live</span></div></div></div>
+      <div class="title-card soon"><span class="game-icon">LoL</span><div><b>League of Legends</b><div class="sub">Riot API · Coming soon</div></div></div>
+      <div class="title-card soon"><span class="game-icon">VAL</span><div><b>Valorant</b><div class="sub">Riot API · Coming soon</div></div></div>
+      <div class="title-card soon"><span class="game-icon">OW2</span><div><b>Overwatch 2</b><div class="sub">Coming soon</div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section class="block how">
+  <div class="wrap">
+    <div class="kicker">How it works</div>
+    <h2 class="title">From Riot ID to roster spot</h2>
+    <div class="lede">Veridium connects players and organizations through verified data.</div>
+    <div class="steps">
+      <div class="step">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7"/></svg></div>
+        <h3>Create Profile</h3><p>Enter your Riot ID. Your match data is pulled from Riot and verified.</p>
+      </div>
+      <div class="step">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg></div>
+        <h3>Build Your Record</h3><p>Every game you play adds to a season-by-season history that can't be edited.</p>
+      </div>
+      <div class="step">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div>
+        <h3>Get Discovered</h3><p>Organizations find and review players on proven performance.</p>
+      </div>
+      <div class="step">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18"/></svg></div>
+        <h3>Find Your Team</h3><p>Apply to open roles with one click. Your verified profile is your resume.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="block">
+  <div class="wrap">
+    <div class="cta-band">
+      <div>
+        <h2>Take the next step in esports.</h2>
+        <p>Whether you're a player chasing your next team or an organization building a winning roster, it starts with verified stats.</p>
+      </div>
+      <a class="btn" href="#create">Create Your Profile</a>
+    </div>
+  </div>
+</section>
+
+<footer class="site">
+  <div class="wrap">
+    <div>
+      <a class="logo" href="/" style="color:var(--text)"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 5h8l5 13 5-13h8L19 28h-6z" fill="#4f46e5"/><path d="M11 5l5 13 5-13h-3l-2 6-2-6z" fill="#8b83ff"/></svg>VERIDIUM</a>
+      <div class="legal">Veridium isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.</div>
+    </div>
+    <nav aria-label="Footer">
+      <a href="players.html">Players</a>
+      <a href="organizations.html">Organizations</a>
+      <a href="jobs.html">Jobs</a>
+      <a href="tournaments.html">Tournaments</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="shell.js"></script>
+<script src="common.js"></script>
+<script>
+  const VERIFIED = '<svg width="18" height="18" viewBox="0 0 24 24" aria-label="Verified"><circle cx="12" cy="12" r="11" fill="#4f7bff"/><path d="M7 12.5l3.2 3.2L17 9" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const ord = (n) => n + ({ 1: 'st', 2: 'nd', 3: 'rd' }[n] || 'th');
+
+  document.querySelector('#createForm select').innerHTML = regionOptions('na1');
+
+  // Create Your Profile: load the Riot ID's verified stats, make it "me", and open the home feed.
+  $('createForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target));
+    const btn = e.target.querySelector('button');
+    btn.disabled = true;
+    setMsg($('createMsg'), 'Loading your verified match history from Riot…');
+    try {
+      const p = await loadPlayer(f.riotId.trim(), f.region);
+      Veridium.setMe(p.riotId, p.region);
+      setMsg($('createMsg'), `Welcome, ${p.riotId.split('#')[0]}! Opening your home feed…`, 'ok');
+      location.href = '/';
+    } catch (err) {
+      setMsg($('createMsg'), err.message, 'error');
+      btn.disabled = false;
+    }
+  });
+
+  // The hero card shows a real verified player: the top-ranked one on this instance.
+  async function renderPreview(players) {
+    const top = players[0];
+    if (!top) {
+      $('stageTag').textContent = 'Your verified profile will look like this';
+      $('preview').querySelector('b').textContent = 'You';
+      return;
+    }
+    let recent = [];
+    try {
+      const p = await api(`/api/players/${encodeURIComponent(top.region)}/${encodeURIComponent(top.riotId)}/profile?cached=1`);
+      recent = (p.recentMatches || []).slice(0, 6);
+    } catch {}
+    const [name, tag] = top.riotId.split('#');
+    $('preview').innerHTML = `
+      <div class="top"><span class="avatar" style="color:#fff">${esc(name.charAt(0).toUpperCase())}</span>
+        <div><b>${esc(name)} ${VERIFIED}</b><span class="sub" style="color:rgba(255,255,255,.8)">TFT Player · ${esc(top.region.toUpperCase())} · #${esc(tag)}</span></div></div>
+      <div class="body">
+        <span class="live">Verified from Riot</span>
+        <div class="nums">
+          <div>Rank<b>${esc(top.rank ? fmtRank(top.rank) : 'Unranked')}</b></div>
+          <div>Top-4<b>${top.totalMatches ? pct(top.winRate) : '–'}</b></div>
+          <div>Avg. Place<b>${top.totalMatches ? top.avgPlacement.toFixed(1) : '–'}</b></div>
+        </div>
+        ${recent.length ? `<div><div class="sub" style="margin-bottom:6px">Recent placements</div><div class="chips" style="display:flex;gap:6px;flex-wrap:wrap">${recent.map((m) => `<span class="place ${m.placement === 1 ? 'p1' : m.placement <= 4 ? 'top4' : ''}">${ord(m.placement)}</span>`).join('')}</div></div>` : ''}
+        <a class="btn" href="${esc(profileUrl(top))}">View full profile</a>
+      </div>`;
+    $('stageTag').textContent = 'A real profile, live from Riot\'s API';
+  }
+
+  Promise.all([api('/api/players').catch(() => []), api('/api/organizations').catch(() => []), api('/api/vacancies').catch(() => [])])
+    .then(([players, orgs, vacancies]) => {
+      $('nPlayers').textContent = players.length;
+      $('nMatches').textContent = players.reduce((n, p) => n + p.totalMatches, 0);
+      $('nOrgs').textContent = orgs.length;
+      $('nRoles').textContent = vacancies.length;
+      renderPreview(players);
+    });
+</script>
+</body>
+</html>
