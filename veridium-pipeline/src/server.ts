@@ -9,6 +9,7 @@ import { OrgRepo } from './orgs/repo';
 import {
   applicationsRouter,
   errorHandler,
+  feedRouter,
   organizationsRouter,
   playerApplicationsRouter,
   vacanciesRouter,
@@ -49,10 +50,11 @@ export function createApp(
   app.use('/api/organizations', organizationsRouter(orgDeps));
   app.use('/api/vacancies', vacanciesRouter(orgDeps));
   app.use('/api/applications', applicationsRouter(orgDeps));
+  app.use('/api/feed', feedRouter(orgDeps));
   app.get('/api/health', (_req, res) => {
     res.json({ ok: true });
   });
-  // Player Profile (index.html), Org Dashboard (org.html) and Jobs (jobs.html) pages.
+  // Pages: Home (index.html), Players, Player Profile, Organizations, Org Dashboard, Tournaments, Jobs.
   app.use(express.static(publicDir));
   app.use(errorHandler); // e.g. malformed JSON bodies, rejected before reaching a router
   return app;
@@ -67,7 +69,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   };
   createApp(deps, undefined, { sitePassword: config.sitePassword }).listen(config.port, config.host, () => {
     console.log(`Veridium pipeline on http://${config.host}:${config.port}${config.sitePassword ? ' (password protected)' : ''}`);
-    console.log(`Profile page: http://localhost:${config.port}/?riotId=WompCat%23NA1&region=na1`);
+    console.log(`Home: http://localhost:${config.port}/`);
+    console.log(`Profile page: http://localhost:${config.port}/player.html?riotId=WompCat%23NA1&region=na1`);
     console.log(`Org dashboard: http://localhost:${config.port}/org.html?id=obscurity-esports`);
   });
 }

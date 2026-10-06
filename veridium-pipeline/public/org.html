@@ -37,15 +37,8 @@
   @media (max-width: 640px) { .stats.four { grid-template-columns: 1fr 1fr; } .settings-rows div { grid-template-columns: 1fr; gap: 2px; } }
 </style>
 </head>
-<body>
-<nav class="nav">
-  <div class="logo">
-    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 5h8l5 13 5-13h8L19 28h-6z" fill="#4f46e5"/><path d="M11 5l5 13 5-13h-3l-2 6-2-6z" fill="#8b83ff"/></svg>
-    VERIDIUM
-  </div>
-  <div style="flex:1"></div>
-  <div class="nav-links"><a href="/">Players</a><a class="active" href="org.html?id=obscurity-esports">Organizations</a><span>Tournaments</span><a href="jobs.html">Jobs</a></div>
-</nav>
+<body data-page="organizations">
+<header id="site-header"></header>
 
 <main id="app" class="org">
   <div class="notice error" id="notice" hidden></div>
@@ -155,6 +148,7 @@
   <datalist id="roleOptions"><option>Player</option><option>Flex</option><option>Sub</option><option>Coach</option><option>Analyst</option><option>Manager</option></datalist>
 </main>
 
+<script src="shell.js"></script>
 <script src="common.js"></script>
 <script>
   const orgId = new URLSearchParams(location.search).get('id') || 'obscurity-esports';

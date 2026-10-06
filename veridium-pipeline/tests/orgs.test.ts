@@ -68,6 +68,15 @@ describe('migrations', () => {
   });
 });
 
+describe('organizations', () => {
+  it('lists orgs with roster size and open vacancies', async () => {
+    await api().post(`/api/organizations/${ORG}/roster`).send({ playerPuuid: PUUID, role: 'TFT' });
+    await postVacancy();
+    const list = (await api().get('/api/organizations')).body;
+    expect(list).toEqual([expect.objectContaining({ id: ORG, name: 'Obscurity Esports', rosterSize: 1, openVacancies: 1 })]);
+  });
+});
+
 describe('roster', () => {
   it('adds, updates and removes members, joining verified stats at read time', async () => {
     const added = await api().post(`/api/organizations/${ORG}/roster`).send({ playerPuuid: PUUID, role: 'TFT' });

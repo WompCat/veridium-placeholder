@@ -110,6 +110,25 @@ export class OrgRepo {
     return org;
   }
 
+  /** Every org with its current roster size and open vacancies. */
+  listOrganizations(): Array<Organization & { rosterSize: number; openVacancies: number }> {
+    const rows = this.db
+      .prepare(
+        `SELECT o.id, o.name, o.created_at,
+           (SELECT COUNT(*) FROM org_memberships m WHERE m.organization_id = o.id AND m.left_at IS NULL) AS roster_size,
+           (SELECT COUNT(*) FROM vacancies v WHERE v.organization_id = o.id AND v.status = 'open') AS open_vacancies
+         FROM organizations o ORDER BY o.name COLLATE NOCASE`,
+      )
+      .all() as Array<{ id: string; name: string; created_at: string; roster_size: number; open_vacancies: number }>;
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      createdAt: r.created_at,
+      rosterSize: r.roster_size,
+      openVacancies: r.open_vacancies,
+    }));
+  }
+
   getOrganization(id: string): Organization | null {
     const row = this.db.prepare('SELECT id, name, created_at FROM organizations WHERE id = ?').get(id) as
       | { id: string; name: string; created_at: string }

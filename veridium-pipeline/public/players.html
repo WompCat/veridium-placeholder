@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Players · Veridium</title>
+<link rel="icon" href="data:," />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="app.css" />
+<style>
+  main.dir { grid-template-columns: minmax(0, 1fr) 320px; }
+  h1.page { font-size: 26px; margin: 0 0 4px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+  .pcard { display: grid; gap: 12px; padding: 16px; color: inherit; }
+  .pcard:hover { border-color: #c7cbff; }
+  .pcard .top { display: flex; gap: 12px; align-items: center; }
+  .pcard .mini-avatar { width: 46px; height: 46px; font-size: 18px; }
+  .pcard .nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 11px; color: var(--muted); }
+  .pcard .nums b { display: block; font-size: 15px; color: var(--text); }
+  .search-local { width: 100%; border: 1px solid var(--border); background: var(--bg); border-radius: 10px; padding: 10px 12px; font: inherit; }
+</style>
+</head>
+<body data-page="players">
+<header id="site-header"></header>
+<main class="dir">
+  <div class="stack">
+    <section class="card pad">
+      <h1 class="page">Players</h1>
+      <div class="sub">Every player Veridium has verified from Riot's API, highest rank first.</div>
+      <hr class="divider" />
+      <input class="search-local" id="filter" placeholder="Filter by name…" aria-label="Filter players" />
+    </section>
+    <section id="orgMatches" hidden>
+      <h2 style="margin:4px 0 10px">Organizations</h2>
+      <div class="grid" id="orgList"></div>
+    </section>
+    <section class="grid" id="list"><div class="card pad empty">Loading…</div></section>
+  </div>
+  <aside class="stack">
+    <section class="card pad">
+      <h2>Look up a player</h2>
+      <div class="sub" style="margin-bottom:12px">Any Riot ID. Veridium loads their verified TFT history from Riot.</div>
+      <form class="form-row" id="lookup">
+        <label class="field" style="flex-basis:100%">Riot ID<input name="riotId" placeholder="Name#TAG" required /></label>
+        <label class="field">Region<select name="region"></select></label>
+        <button class="btn primary">Open profile</button>
+      </form>
+    </section>
+  </aside>
+</main>
+<script src="shell.js"></script>
+<script src="common.js"></script>
+<script>
+  let players = [];
+  let orgs = [];
+  const q = new URLSearchParams(location.search).get('q') ?? '';
+  $('filter').value = q;
+  document.querySelector('#lookup select').innerHTML = regionOptions(Veridium.getMe()?.region ?? 'na1');
+
+  function render() {
+    const term = $('filter').value.trim().toLowerCase();
+    const shown = players.filter((p) => p.riotId.toLowerCase().includes(term));
+    $('list').innerHTML = shown.length ? shown.map((p) => `
+      <a class="card pcard" href="${esc(profileUrl(p))}">
+        <div class="top"><span class="mini-avatar">${esc(p.riotId.charAt(0).toUpperCase())}</span>
+          <div><b>${esc(p.riotId.split('#')[0])}</b> <span class="verified">✔</span><div class="sub">#${esc(p.riotId.split('#')[1])} · ${esc(p.region.toUpperCase())} · TFT</div></div></div>
+        <div class="nums">
+          <span>Rank<b>${esc(p.rank ? fmtRank(p.rank) : 'Unranked')}</b></span>
+          <span>Top-4<b>${p.totalMatches ? pct(p.winRate) : '–'}</b></span>
+          <span>Games<b>${p.totalMatches}</b></span>
+        </div>
+      </a>`).join('') : `<div class="card pad empty" style="grid-column:1/-1">No players match "${esc(term)}". Look them up by Riot ID →</div>`;
+    const orgHits = term ? orgs.filter((o) => o.name.toLowerCase().includes(term)) : [];
+    $('orgMatches').hidden = !orgHits.length;
+    $('orgList').innerHTML = orgHits.map((o) => `
+      <a class="card pcard" href="org.html?id=${encodeURIComponent(o.id)}">
+        <div class="top"><span class="org-chip" style="width:46px;height:46px;border-radius:10px;background:linear-gradient(135deg,#2f3bd6,#11145a);color:#fff;display:grid;place-items:center;font-weight:800">${esc(initials(o.name))}</span>
+          <div><b>${esc(o.name)}</b><div class="sub">${o.rosterSize} on roster · ${o.openVacancies} open role${o.openVacancies === 1 ? '' : 's'}</div></div></div>
+      </a>`).join('');
+  }
+
+  $('filter').addEventListener('input', render);
+  $('lookup').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target));
+    location.href = Veridium.playerHref(f.riotId.trim(), f.region);
+  });
+
+  Promise.all([api('/api/players'), api('/api/organizations').catch(() => [])])
+    .then(([p, o]) => { players = p; orgs = o; render(); })
+    .catch((err) => { $('list').innerHTML = `<div class="card pad empty">${esc(err.message)}</div>`; });
+</script>
+</body>
+</html>
