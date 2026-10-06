@@ -1,0 +1,27 @@
+# Render Blueprint: in the Render dashboard choose New > Blueprint and pick this repo.
+# Render reads this file, builds veridium-pipeline/Dockerfile, and attaches a persistent disk
+# so the sqlite database survives deploys and restarts.
+services:
+  - type: web
+    name: veridium
+    runtime: docker
+    dockerContext: ./veridium-pipeline
+    dockerfilePath: ./veridium-pipeline/Dockerfile
+    plan: starter # persistent disks need a paid instance type
+    branch: main
+    autoDeploy: true
+    healthCheckPath: /api/health
+    disk:
+      name: veridium-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: DB_PATH
+        value: /var/data/veridium.db # must be on the disk's mountPath
+      - key: SEASONS
+        value: "3"
+      - key: RIOT_API_KEY
+        sync: false # entered in the dashboard; dev keys expire every 24h
+      - key: SITE_PASSWORD
+        sync: false # strongly recommended: there are no accounts yet
+      # PORT is injected by Render; the app reads process.env.PORT.
