@@ -41,6 +41,8 @@
   .site-nav svg { width: 19px; height: 19px; }
   .me-chip { flex: none; display: flex; align-items: center; }
   .me-chip .mini-avatar { width: 36px; height: 36px; font-size: 15px; box-shadow: 0 0 0 2px #fff, 0 0 0 3px var(--accent-soft); }
+  .header-ctas { display: flex; gap: 8px; flex: none; }
+  @media (max-width: 640px) { .header-ctas { margin-left: auto; } .header-ctas .btn:first-child { display: none; } }
   .me-chip.setup { font-size: 13px; font-weight: 600; border: 1px solid var(--border); border-radius: 999px; padding: 7px 12px; }
   @media (max-width: 1100px) { .site-nav span { display: none; } .site-nav a { padding: 0 10px; } }
   @media (max-width: 640px) {
