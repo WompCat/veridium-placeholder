@@ -15,15 +15,8 @@
   h1.page { font-size: 26px; margin: 0 0 4px; }
 </style>
 </head>
-<body>
-<nav class="nav">
-  <div class="logo">
-    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 5h8l5 13 5-13h8L19 28h-6z" fill="#4f46e5"/><path d="M11 5l5 13 5-13h-3l-2 6-2-6z" fill="#8b83ff"/></svg>
-    VERIDIUM
-  </div>
-  <div style="flex:1"></div>
-  <div class="nav-links"><a href="/">Players</a><a href="org.html?id=obscurity-esports">Organizations</a><span>Tournaments</span><a class="active" href="jobs.html">Jobs</a></div>
-</nav>
+<body data-page="jobs">
+<header id="site-header"></header>
 
 <main>
   <div class="stack">
@@ -53,17 +46,14 @@
   </aside>
 </main>
 
+<script src="shell.js"></script>
 <script src="common.js"></script>
 <script>
   let openForm = null; // vacancy id with the apply form showing
-  const ME_KEY = 'veridium.lastRiotId';
-
-  // Remember the last Riot ID used to apply, to pre-fill the next application (this browser only).
-  function rememberedPlayer() {
-    try { return JSON.parse(localStorage.getItem(ME_KEY)) || null; } catch { return null; }
-  }
+  // "Me" (shared with the site header): the Riot ID last used here, to pre-fill the next application.
+  const rememberedPlayer = () => Veridium.getMe();
   function rememberPlayer(riotId, region) {
-    try { localStorage.setItem(ME_KEY, JSON.stringify({ riotId, region })); } catch {}
+    Veridium.setMe(riotId, region);
     renderMyApps();
   }
   function renderMyApps() {

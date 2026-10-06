@@ -153,6 +153,20 @@ export class Store {
       : null;
   }
 
+  /** Every player the pipeline has loaded (lobby-mates without a profile load aren't included). */
+  listPlayers(): StoredPlayer[] {
+    const rows = this.db
+      .prepare('SELECT puuid, game_name, tag_line, region, last_match_at FROM players ORDER BY game_name COLLATE NOCASE')
+      .all() as Array<{ puuid: string; game_name: string; tag_line: string; region: string; last_match_at: number | null }>;
+    return rows.map((r) => ({
+      puuid: r.puuid,
+      gameName: r.game_name,
+      tagLine: r.tag_line,
+      region: r.region,
+      lastMatchAt: r.last_match_at,
+    }));
+  }
+
   getPlayer(puuid: string): StoredPlayer | null {
     const row = this.db
       .prepare('SELECT puuid, game_name, tag_line, region, last_match_at FROM players WHERE puuid = ?')

@@ -3,443 +3,357 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Veridium Player Profile</title>
+<title>Veridium</title>
 <link rel="icon" href="data:," />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="app.css" />
+<style>
+  main.home { max-width: 1320px; grid-template-columns: 290px minmax(0, 1fr) 330px; align-items: start; }
+  .col { display: grid; gap: 16px; align-content: start; min-width: 0; }
+
+  /* Me card */
+  .me-banner { height: 84px; border-radius: 14px 14px 0 0; background: var(--banner); }
+  .me-body { padding: 0 18px 18px; margin-top: -42px; }
+  .me-body .avatar { width: 84px; height: 84px; font-size: 32px; color: #fff; }
+  .me-name { display: flex; align-items: center; gap: 6px; font-size: 20px; font-weight: 800; margin-top: 8px; }
+  .me-name a { color: var(--text); }
+  .me-rank { display: flex; align-items: center; gap: 12px; margin-top: 14px; padding: 12px; border-radius: 12px; background: var(--bg); }
+  .me-rank b { display: block; font-size: 15px; }
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .tile { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
+  .tile .label { font-size: 11px; color: var(--muted); }
+  .tile .value { font-size: 20px; font-weight: 700; margin-top: 2px; }
+  .game-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+  .game-icon.sm { width: 38px; height: 38px; font-size: 12px; border-radius: 9px; }
+  .game-icon.muted { background: #e8eaf3; color: var(--muted); }
+  .links { display: grid; gap: 8px; margin-top: 12px; }
+  .links a { display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; color: var(--text); font-weight: 500; font-size: 13px; }
+  .links a:hover { background: var(--bg); }
+  .section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+  .section-head a { font-size: 12px; font-weight: 600; }
+
+  /* Composer */
+  .composer { display: flex; gap: 12px; align-items: center; }
+  .composer input { flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; font: inherit; background: var(--bg); color: var(--muted); }
+  .actions3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
+  .actions3 a { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 11px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); font-weight: 600; font-size: 13px; }
+  .actions3 a:hover { background: #e2e5ff; }
+
+  /* Feed */
+  .post-head { display: flex; align-items: center; gap: 12px; }
+  .post-head .mini-avatar, .post-head .org-chip { width: 42px; height: 42px; font-size: 16px; }
+  .post-head b a { color: var(--text); }
+  .post-text { margin: 12px 0; }
+  .org-chip { border-radius: 10px; background: linear-gradient(135deg, #2f3bd6, #11145a); color: #fff; display: grid; place-items: center; font-weight: 800; flex: none; }
+  .match-card { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) 170px; }
+  .match-card .info { padding: 14px 16px; display: grid; gap: 10px; }
+  .match-card .art { background: radial-gradient(circle at 70% 40%, #8b7bff 0, transparent 55%), var(--banner); }
+  .match-top { display: flex; align-items: center; gap: 12px; }
+  .match-cols { display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: 12px; color: var(--muted); }
+  .match-cols b { display: block; color: var(--text); font-size: 13px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .roster-banner { margin-top: 12px; border-radius: 12px; background: linear-gradient(110deg, #0c0e24, #1d1b4d); color: #fff; padding: 18px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+  .roster-banner .org-name { font-size: 20px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; flex: 0 1 180px; }
+  .roster-list { display: flex; gap: 16px; flex-wrap: wrap; border-left: 1px solid rgba(255,255,255,.18); padding-left: 20px; flex: 1; }
+  .roster-list .kicker { flex-basis: 100%; font-size: 11px; letter-spacing: .08em; opacity: .7; }
+  .roster-list div { text-align: center; font-size: 12px; }
+  .roster-list .mini-avatar { width: 40px; height: 40px; margin: 0 auto 4px; font-size: 15px; border: 2px solid rgba(255,255,255,.5); }
+  .roster-list small { opacity: .7; display: block; }
+  .post-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 12px; color: var(--muted); }
+
+  /* Right column */
+  .row-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .row-item:last-child { border-bottom: 0; }
+  .row-item .grow { flex: 1; min-width: 0; }
+  .row-item .grow b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .game-tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .game-tiles div { border: 1px solid var(--border); border-radius: 10px; padding: 10px 4px; text-align: center; font-size: 11px; color: var(--muted); }
+  .game-tiles .game-icon { width: 34px; height: 34px; font-size: 11px; margin: 0 auto 6px; border-radius: 8px; }
+  .game-tiles b { display: block; color: var(--text); font-size: 12px; }
+
+  @media (max-width: 1200px) {
+    main.home { grid-template-columns: 270px minmax(0, 1fr); }
+    .col.right { grid-column: 1 / -1; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+  }
+  @media (max-width: 860px) {
+    main.home { grid-template-columns: minmax(0, 1fr); }
+    /* One column: me, then the feed, then everything else. */
+    main.home > .col, main.home > .col.right { display: contents; }
+    #me { order: 1; } .composer-card { order: 2; } #feed { order: 3; } #myGames, .quick-links { order: 4; } .col.right > * { order: 5; }
+    .match-card { grid-template-columns: minmax(0, 1fr); }
+    .match-card .art { display: none; }
+  }
+  @media (max-width: 480px) { .actions3 { grid-template-columns: 1fr; } .game-tiles { grid-template-columns: repeat(3, 1fr); } }
+</style>
 </head>
-<body>
-<nav class="nav">
-  <div class="logo">
-    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 5h8l5 13 5-13h8L19 28h-6z" fill="#4f46e5"/><path d="M11 5l5 13 5-13h-3l-2 6-2-6z" fill="#8b83ff"/></svg>
-    VERIDIUM
-  </div>
-  <form class="search" id="search">
-    <input id="riotId" placeholder="Riot ID, e.g. WompCat#NA1" aria-label="Riot ID" />
-    <select id="region" aria-label="Region">
-      <option>na1</option><option>euw1</option><option>eun1</option><option>kr</option><option>br1</option>
-      <option>la1</option><option>la2</option><option>oc1</option><option>jp1</option><option>tr1</option>
-    </select>
-    <button>Load</button>
-  </form>
-  <div class="nav-links"><a class="active" href="/">Players</a><a href="org.html?id=obscurity-esports">Organizations</a><span>Tournaments</span><a href="jobs.html">Jobs</a></div>
-</nav>
+<body data-page="home">
+<header id="site-header"></header>
 
-<main id="app">
-  <div class="notice" id="notice" hidden></div>
-
-  <div class="stack">
-    <section class="card">
-      <div class="banner">
-        <div class="avatar" id="avatar">?</div>
-        <div class="who">
-          <h1><span id="name">Loading…</span>
-            <svg class="check" viewBox="0 0 24 24" aria-label="Verified"><circle cx="12" cy="12" r="11" fill="#4f7bff"/><path d="M7 12.5l3.2 3.2L17 9" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </h1>
-          <div class="meta" id="meta">TFT Player</div>
-        </div>
-        <div class="rank-badge">
-          <svg width="34" height="34" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2l12 6v9c0 7-5.5 11.5-12 13C9.5 28.5 4 24 4 17V8z" fill="#6c63ff"/><path d="M10 12l6 9 6-9" stroke="#fff" stroke-width="2.4" fill="none"/></svg>
-          <div><b id="rankText">Unranked</b><span id="rankSub">TFT Ranked</span></div>
-        </div>
-      </div>
-      <div class="tabs"><span>Overview</span><span class="on">Games</span><span>Matches</span><span>Tournaments</span><span>Stats</span><span>About</span></div>
+<main class="home">
+  <!-- Left: me -->
+  <div class="col">
+    <section class="card" id="me"><div class="pad empty">Loading…</div></section>
+    <section class="card pad" id="myGames" hidden>
+      <div class="section-head"><h2>My Games</h2></div>
+      <div id="myGamesList"></div>
     </section>
-
-    <section class="card pad">
-      <div class="game-head">
-        <div class="game-icon">TFT</div>
-        <div style="flex:1">
-          <h2>Teamfight Tactics <span class="pill">Primary Game</span></h2>
-          <div class="sub" id="windowNote">Riot Games · Ranked &amp; Normal</div>
-        </div>
-      </div>
-      <div class="season-tabs" id="seasonTabs" role="tablist" aria-label="Season"></div>
-      <div class="stats">
-        <div class="stat"><div class="label">Total Matches</div><div class="value" id="total">–</div><div class="hint" id="totalHint"></div></div>
-        <div class="stat"><div class="label">Win Rate (Top 4)</div><div class="value" id="winRate">–</div><div class="hint" id="winHint"></div></div>
-        <div class="stat"><div class="label">Avg. Place</div><div class="value" id="avg">–</div><div class="hint" id="avgHint"></div></div>
-        <div class="stat"><div class="label" id="fourthLabel">Highest Rank</div><div class="value" id="fourth" style="font-size:18px">–</div><div class="hint" id="fourthHint">Seen by Veridium</div></div>
-      </div>
-    </section>
-
-    <section class="card pad">
-      <div class="table-head">
-        <h2 id="matchesTitle">Matches</h2>
-        <div class="seg" id="queueFilter">
-          <button data-q="RANKED_TFT" class="on">Ranked</button>
-          <button data-q="NORMAL_TFT">Normal</button>
-          <button data-q="">All</button>
-        </div>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Date</th><th>Result</th><th>LP Change</th><th>Rank After</th><th>Match</th></tr></thead>
-          <tbody id="matches"></tbody>
-        </table>
-      </div>
-      <button class="expand" id="expand" aria-expanded="false" aria-controls="matches" hidden></button>
+    <section class="card pad quick-links">
+      <h2>Quick Links</h2>
+      <div class="links" id="quickLinks"></div>
     </section>
   </div>
 
-  <aside class="stack">
-    <section class="card pad">
-      <h2>Verified Stats</h2>
-      <div class="sub">All stats are pulled from official Riot APIs and cannot be edited.</div>
-      <div class="checks">
-        <div><span class="tick">✓</span><span>Match History<small>Official APIs</small></span></div>
-        <div><span class="tick">✓</span><span>Rank Verification<small>Real-time</small></span></div>
-        <div><span class="tick">✓</span><span>Placements<small>Per match</small></span></div>
-        <div><span class="tick">✓</span><span>No Self-Reported Data<small>100% verified</small></span></div>
+  <!-- Center: composer + feed -->
+  <div class="col">
+    <section class="card pad composer-card">
+      <div class="composer">
+        <span class="mini-avatar" id="composerAvatar" style="width:42px;height:42px">?</span>
+        <input disabled placeholder="Posting is coming soon. For now, your matches post themselves." aria-label="Posting is coming soon" />
+      </div>
+      <div class="actions3">
+        <a id="shareMatch" href="players.html">🎮 Share match</a>
+        <a href="jobs.html">🤝 Looking for team</a>
+        <a href="players.html">🔎 Find players</a>
       </div>
     </section>
+    <div class="col" id="feed"><section class="card pad empty">Loading activity…</section></div>
+  </div>
+
+  <!-- Right: what's happening -->
+  <div class="col right">
     <section class="card pad">
-      <h2>Player Activity</h2>
-      <div class="rows">
-        <div><span>Last Match</span><span id="lastMatch">–</span></div>
-        <div><span>1st Place Rate</span><span id="top1">–</span></div>
-        <div><span>Current LP</span><span id="lp">–</span></div>
-        <div><span>Region</span><span id="regionText">–</span></div>
-      </div>
+      <div class="section-head"><h2>Open Vacancies</h2><a href="jobs.html">View all →</a></div>
+      <div id="vacancies"></div>
     </section>
-    <section class="card pad" id="applications" hidden>
-      <h2>Applications</h2>
-      <div class="sub">Where this player has applied, and what the org decided.</div>
-      <div class="list" id="appList" style="margin-top:12px"></div>
+    <section class="card pad">
+      <div class="section-head"><h2>Players on Veridium</h2><a href="players.html">View all →</a></div>
+      <div id="players"></div>
     </section>
-    <section class="card pad" id="openings" hidden>
-      <div class="table-head" style="margin-bottom:4px"><h2>Open Vacancies</h2><a href="jobs.html" class="sub">See all</a></div>
-      <div class="sub">Apply with this verified profile. No forms, the org sees these stats.</div>
-      <div class="list" id="openingList" style="margin-top:12px"></div>
+    <section class="card pad">
+      <div class="section-head"><h2>Upcoming Tournaments</h2><span class="placeholder-tag">Coming soon</span></div>
+      <div class="sub">Verified tournament results and brackets are on the roadmap. <a href="tournaments.html">Learn more</a></div>
     </section>
-  </aside>
+    <section class="card pad">
+      <div class="section-head"><h2>Games on Veridium</h2></div>
+      <div class="game-tiles" id="games"></div>
+    </section>
+  </div>
 </main>
 
+<script src="shell.js"></script>
+<script src="common.js"></script>
 <script>
-  const COLLAPSED_ROWS = 5;
+  const RANK_EMBLEM = '<svg width="40" height="40" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2l12 6v9c0 7-5.5 11.5-12 13C9.5 28.5 4 24 4 17V8z" fill="#6c63ff"/><path d="M10 12l6 9 6-9" stroke="#fff" stroke-width="2.4" fill="none"/></svg>';
+  const VERIFIED = '<svg width="18" height="18" viewBox="0 0 24 24" aria-label="Verified"><circle cx="12" cy="12" r="11" fill="#4f7bff"/><path d="M7 12.5l3.2 3.2L17 9" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const ord = (n) => n + ({ 1: 'st', 2: 'nd', 3: 'rd' }[n] || 'th');
+  const placeChip = (p) => `<span class="place ${p === 1 ? 'p1' : p <= 4 ? 'top4' : ''}">${ord(p)}</span>`;
+  const name = (riotId) => riotId.split('#')[0];
 
-  // Shown only when the API isn't reachable (e.g. page opened as a file, or no RIOT_API_KEY yet).
-  const SAMPLE = (() => {
-    const m = (id, date, set, placement, lpChange = null, rankAfter = null, queueType = 'RANKED_TFT') =>
-      ({ matchId: id, date, set, queueType, placement, lpChange, rankAfter });
-    const current = [
-      m('NA1_130', '2026-09-27', 18, 1, 43, 'DIAMOND IV'), m('NA1_129', '2026-09-26', 18, 4, 12, 'DIAMOND IV'),
-      m('NA1_128', '2026-09-26', 18, 3, 16, 'DIAMOND IV'), m('NA1_127', '2026-09-25', 18, 8, -23, 'DIAMOND III'),
-      m('NA1_126', '2026-09-24', 18, 2, 27, 'DIAMOND III'), m('NA1_125', '2026-09-22', 18, 5),
-      m('NA1_124', '2026-09-21', 18, 6, null, null, 'NORMAL_TFT'), m('NA1_123', '2026-09-20', 18, 1),
-    ];
-    const past = [m('NA1_101', '2026-07-30', 17, 2), m('NA1_100', '2026-07-28', 17, 7), m('NA1_99', '2026-07-21', 17, 4)];
-    const stats = (ms) => {
-      const n = ms.length, top4 = ms.filter((x) => x.placement <= 4).length;
-      return {
-        totalMatches: n, rankedMatches: ms.filter((x) => x.queueType === 'RANKED_TFT').length, winRate: top4 / n,
-        avgPlacement: ms.reduce((t, x) => t + x.placement, 0) / n, top1Rate: ms.filter((x) => x.placement === 1).length / n,
-      };
-    };
-    return {
-      riotId: 'ShadowReign#NA1', region: 'na1', verified: true,
-      rank: { tier: 'DIAMOND', division: 'IV', leaguePoints: 42, percentile: 0.008 },
-      highestRank: 'DIAMOND IV', currentSet: 18, ...stats(current), recentMatches: current,
-      history: { complete: true, syncing: false },
-      seasons: [
-        { set: 18, label: 'Set 18', current: true, ...stats(current), matches: current },
-        { set: 17, label: 'Set 17', current: false, ...stats(past), matches: past },
-        { set: 16, label: 'Set 16', current: false, totalMatches: 0, rankedMatches: 0, winRate: 0, avgPlacement: 0, top1Rate: 0, matches: [] },
-      ],
-    };
-  })();
-
-  const $ = (id) => document.getElementById(id);
-  const title = (s) => s ? s.charAt(0) + s.slice(1).toLowerCase() : s;
-  const fmtRank = (s) => s ? s.split(' ').map((w, i) => i === 0 ? title(w) : w).join(' ') : '–';
-  const pct = (n) => (n * 100).toFixed(1) + '%';
-  const ord = (n) => n + ({ 1: 'st', 2: 'nd', 3: 'rd' }[n] || 'th'); // TFT placements are 1–8
-  const fmtDate = (d) => new Date(d + 'T12:00:00Z').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-
-  const view = { profile: null, set: null, queue: 'RANKED_TFT', expanded: false };
-  let pollTimer = null;
-
-  function selectedSeason() {
-    const seasons = view.profile.seasons || [];
-    return seasons.find((s) => s.set === view.set) || seasons[0] || null;
-  }
-
-  function renderHeader(p) {
-    const [name, tag] = p.riotId.split('#');
-    $('name').textContent = name;
-    $('avatar').textContent = name.charAt(0).toUpperCase();
-    $('meta').textContent = `TFT Player · ${p.region.toUpperCase()} · #${tag}`;
-    $('regionText').textContent = p.region.toUpperCase();
-    document.title = `${name} · Veridium`;
-
-    if (p.rank) {
-      const apex = ['MASTER', 'GRANDMASTER', 'CHALLENGER'].includes(p.rank.tier);
-      $('rankText').textContent = fmtRank(apex ? p.rank.tier : `${p.rank.tier} ${p.rank.division}`);
-      $('rankSub').textContent = p.rank.percentile != null
-        ? `TFT Ranked · Top ${pct(p.rank.percentile)}` : `TFT Ranked · ${p.rank.leaguePoints} LP`;
-      $('lp').textContent = `${p.rank.leaguePoints} LP`;
-    } else {
-      $('rankText').textContent = 'Unranked';
-      $('rankSub').textContent = 'TFT Ranked';
-      $('lp').textContent = '–';
-    }
-    const last = p.recentMatches[0];
-    $('lastMatch').textContent = last ? `${fmtDate(last.date)} · ${ord(last.placement)} Place` : '–';
-    $('top1').textContent = pct(p.top1Rate ?? 0);
-  }
-
-  function renderSeasonTabs() {
-    $('seasonTabs').innerHTML = (view.profile.seasons || []).map((s) =>
-      `<button role="tab" data-set="${s.set}" aria-selected="${s.set === view.set}" class="${s.set === view.set ? 'on' : ''}">
-        ${esc(s.label)}${s.current ? '<span class="cur-label"> · Current</span>' : ''}<span class="count">${s.totalMatches}</span></button>`).join('');
-  }
-
-  function renderSeasonStats() {
-    const s = selectedSeason();
-    if (!s) return;
-    $('total').textContent = s.totalMatches;
-    $('totalHint').textContent = `(${s.rankedMatches} Ranked / ${s.totalMatches - s.rankedMatches} Normal)`;
-    $('winRate').textContent = s.totalMatches ? pct(s.winRate) : '–';
-    const wins = Math.round(s.winRate * s.totalMatches);
-    $('winHint').textContent = s.totalMatches ? `(${wins}W / ${s.totalMatches - wins}L)` : '';
-    $('avg').textContent = s.totalMatches ? s.avgPlacement.toFixed(1) : '–';
-    $('avgHint').textContent = s.totalMatches ? `(1st: ${pct(s.top1Rate)})` : '';
-    if (s.current) {
-      $('fourthLabel').textContent = 'Highest Rank';
-      $('fourth').textContent = fmtRank(view.profile.highestRank);
-      $('fourthHint').textContent = 'Seen by Veridium';
-    } else {
-      // Riot only reports the current rank, so past seasons show finishes instead.
-      $('fourthLabel').textContent = '1st Place Finishes';
-      $('fourth').textContent = s.matches.filter((m) => m.placement === 1).length;
-      $('fourthHint').textContent = 'Rank not tracked for past sets';
-    }
-    $('windowNote').textContent = `Riot Games · ${s.label}${s.current ? ' (current season)' : ''} · ${s.totalMatches} games`;
-  }
-
-  function renderMatches() {
-    const s = selectedSeason();
-    const all = s ? s.matches.filter((m) => !view.queue || m.queueType === view.queue) : [];
-    const rows = view.expanded ? all : all.slice(0, COLLAPSED_ROWS);
-    const queueName = { RANKED_TFT: 'Ranked', NORMAL_TFT: 'Normal' }[view.queue] || 'All';
-    $('matchesTitle').textContent = s ? `${s.label} Matches` : 'Matches';
-
-    $('matches').innerHTML = rows.length ? rows.map((m) => {
-      const cls = m.placement === 1 ? 'p1' : m.placement <= 4 ? 'top4' : '';
-      const lp = m.lpChange == null ? '<span class="dim">—</span>'
-        : `<span class="${m.lpChange >= 0 ? 'up' : 'down'}">${m.lpChange >= 0 ? '+' : ''}${m.lpChange}</span>`;
-      return `<tr><td>${fmtDate(m.date)}</td><td><span class="place ${cls}">${ord(m.placement)}</span></td>
-        <td>${lp}</td><td>${m.rankAfter ? esc(fmtRank(m.rankAfter)) : '<span class="dim">—</span>'}</td>
-        <td class="dim">${esc(m.matchId)}</td></tr>`;
-    }).join('') : `<tr><td colspan="5" class="empty">No ${queueName === 'All' ? '' : queueName.toLowerCase() + ' '}matches in ${s ? esc(s.label) : 'this season'}${view.profile.history.complete ? '' : ' yet'}.</td></tr>`;
-
-    const btn = $('expand');
-    btn.hidden = all.length <= COLLAPSED_ROWS;
-    btn.setAttribute('aria-expanded', String(view.expanded));
-    btn.innerHTML = view.expanded
-      ? `Show fewer <span class="chev">▾</span>`
-      : `Show all ${all.length} ${queueName === 'All' ? '' : queueName.toLowerCase() + ' '}matches <span class="chev">▾</span>`;
-  }
-
-  function render(p) {
-    view.profile = p;
-    const sets = (p.seasons || []).map((s) => s.set);
-    if (!sets.includes(view.set)) view.set = sets[0] ?? null;
-    renderHeader(p);
-    renderSeasonTabs();
-    renderSeasonStats();
-    renderMatches();
-  }
-
-  // ---- Vacancies & applications (no accounts yet: applications are made as the profile shown) ----
-  const OPENINGS_SHOWN = 4;
-  const isoDate = (iso) => fmtDate(iso.slice(0, 10));
-  const jsonOrThrow = async (res) => {
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-    return data;
-  };
-
-  async function loadOrgCards(riotId, region) {
-    const playerPath = `/api/players/${encodeURIComponent(region)}/${encodeURIComponent(riotId)}`;
+  // ---- Left column: me ----
+  async function loadMeProfile(me) {
+    const path = `/api/players/${encodeURIComponent(me.region)}/${encodeURIComponent(me.riotId)}/profile`;
     try {
-      const [apps, openings] = await Promise.all([
-        fetch(`${playerPath}/applications`).then(jsonOrThrow),
-        fetch('/api/vacancies').then(jsonOrThrow),
-      ]);
-      renderApplications(apps);
-      renderOpenings(openings, apps, riotId, region);
+      return await api(`${path}?cached=1`); // cached first: the home page shouldn't hit Riot on every visit
     } catch {
-      $('applications').hidden = $('openings').hidden = true;
+      return loadPlayer(me.riotId, me.region);
     }
   }
 
-  function renderApplications(apps) {
-    $('applications').hidden = !apps.length;
-    $('appList').innerHTML = apps.map((a) => {
-      const note = a.status === 'accepted'
-        ? (a.onRoster ? 'Accepted · on the roster' : 'Accepted · the org will add you to the roster')
-        : a.status === 'rejected' ? 'Not selected this time' : 'Waiting for the org to review';
-      return `<div class="item">
-        <div class="item-head">
-          <div><div class="item-title">${esc(a.vacancy.title)}</div>
-            <div class="sub"><a href="org.html?id=${encodeURIComponent(a.organizationId)}">${esc(a.organizationName)}</a> · applied ${esc(isoDate(a.appliedAt))}</div></div>
-          <span class="status ${esc(a.status)}">${esc(a.status)}</span>
-        </div>
-        <div class="sub" style="margin-top:6px">${esc(note)}</div>
+  function renderSetup(message) {
+    $('me').innerHTML = `
+      <div class="me-banner"></div>
+      <div class="me-body">
+        <span class="avatar">?</span>
+        <div class="me-name">Make Veridium yours</div>
+        <div class="sub" style="margin-top:4px">Enter your Riot ID to see your verified TFT stats here. No account needed, it's remembered on this device.</div>
+        <form class="form-row" id="meForm" style="margin-top:14px">
+          <label class="field" style="flex-basis:100%">Riot ID<input name="riotId" placeholder="Name#TAG" required /></label>
+          <label class="field">Region<select name="region">${regionOptions('na1')}</select></label>
+          <button class="btn primary">Continue</button>
+        </form>
+        <div class="form-msg ${message ? 'error' : ''}" id="meMsg">${esc(message ?? '')}</div>
       </div>`;
-    }).join('');
-  }
-
-  function renderOpenings(openings, apps, riotId, region) {
-    const applied = new Map(apps.map((a) => [a.vacancyId, a.status]));
-    const shown = openings.slice(0, OPENINGS_SHOWN);
-    $('openings').hidden = !shown.length;
-    $('openingList').innerHTML = shown.map((v) => `
-      <div class="item">
-        <div class="item-head">
-          <div><div class="item-title">${esc(v.title)}${v.role ? ` <span class="pill">${esc(v.role)}</span>` : ''}</div>
-            <div class="sub">${esc(v.organizationName)} · ${esc(v.game)} · ${esc(v.region)}</div></div>
-          ${applied.has(v.id)
-            ? `<span class="status ${esc(applied.get(v.id))}">${esc(applied.get(v.id) === 'pending' ? 'applied' : applied.get(v.id))}</span>`
-            : `<button class="btn small primary" data-apply="${esc(v.id)}">Apply</button>`}
-        </div>
-      </div>`).join('');
-    $('openingList').onclick = async (e) => {
-      const b = e.target.closest('button[data-apply]');
-      if (!b) return;
-      b.disabled = true;
+    $('meForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = Object.fromEntries(new FormData(e.target));
+      setMsg($('meMsg'), 'Loading your verified profile from Riot…');
       try {
-        await fetch(`/api/vacancies/${encodeURIComponent(b.dataset.apply)}/applications`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ riotId, region }),
-        }).then(jsonOrThrow);
-        await loadOrgCards(riotId, region);
+        const p = await loadPlayer(f.riotId.trim(), f.region);
+        Veridium.setMe(p.riotId, p.region);
+        renderLeft();
       } catch (err) {
-        notice(err.message, 'error');
-        b.disabled = false;
+        setMsg($('meMsg'), err.message, 'error');
       }
-    };
+    });
+    $('myGames').hidden = true;
+    $('composerAvatar').textContent = '?';
+    renderQuickLinks(null);
   }
 
-  function notice(text, kind) {
-    const n = $('notice');
-    n.hidden = !text;
-    n.textContent = text || '';
-    n.className = 'notice' + (kind ? ' ' + kind : '');
+  function renderQuickLinks(me) {
+    const links = me
+      ? [[Veridium.playerHref(me.riotId, me.region), '👤', 'View my profile'],
+         [Veridium.playerHref(me.riotId, me.region) + '#applications', '📨', 'My applications'],
+         ['jobs.html', '💼', 'Browse vacancies'],
+         ['#me', '🔁', 'Switch profile']]
+      : [['players.html', '🔎', 'Find players'], ['jobs.html', '💼', 'Browse vacancies'], ['organizations.html', '🏢', 'Organizations']];
+    $('quickLinks').innerHTML = links.map(([href, icon, label]) =>
+      `<a href="${href}" ${label === 'Switch profile' ? 'data-switch' : ''}><span aria-hidden="true">${icon}</span>${label}</a>`).join('');
+    const sw = document.querySelector('[data-switch]');
+    if (sw) sw.addEventListener('click', (e) => { e.preventDefault(); Veridium.clearMe(); renderSetup(); });
   }
 
-  function historyNotice(p) {
-    const seasons = p.seasons || [];
-    const loaded = seasons.reduce((n, s) => n + s.totalMatches, 0);
-    const range = seasons.length > 1 ? `${seasons.at(-1).label}–${seasons[0].set}` : seasons[0]?.label || '';
-    if (p.history.syncing) {
-      notice(`Loading match history for ${range}: ${loaded} matches so far. This page updates as they arrive.`, 'info');
-    } else if (!p.history.complete) {
-      notice('Match history is incomplete. Reload the page to resume loading it.', 'info');
-    } else {
-      notice('');
-    }
-  }
-
-  // While the server backfills history, re-read the cached profile (no Riot calls) every few seconds.
-  function pollHistory(riotId, region) {
-    clearTimeout(pollTimer);
-    pollTimer = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/players/${encodeURIComponent(region)}/${encodeURIComponent(riotId)}/profile?cached=1`);
-        if (!res.ok) return;
-        const p = await res.json();
-        render(p);
-        historyNotice(p);
-        if (p.history.syncing) pollHistory(riotId, region);
-      } catch {
-        pollHistory(riotId, region);
-      }
-    }, 4000);
-  }
-
-  async function load(riotId, region) {
-    clearTimeout(pollTimer);
-    const url = new URL(location.href);
-    url.searchParams.set('riotId', riotId);
-    url.searchParams.set('region', region);
-    history.replaceState(null, '', url);
-    $('app').classList.add('loading');
+  async function renderLeft() {
+    const me = Veridium.getMe();
+    if (!me) return renderSetup();
+    let p;
     try {
-      const profilePath = `/api/players/${encodeURIComponent(region)}/${encodeURIComponent(riotId)}/profile`;
-      const res = await fetch(profilePath);
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        // Riot unreachable (e.g. expired dev key): fall back to the cached profile if there is one.
-        const cached = res.status >= 500 ? await fetch(`${profilePath}?cached=1`).catch(() => null) : null;
-        if (!cached?.ok) throw Object.assign(new Error(body.error || `HTTP ${res.status}`), { api: true });
-        const cachedBody = await cached.json();
-        view.set = cachedBody.currentSet;
-        view.expanded = false;
-        render(cachedBody);
-        notice(`Showing cached stats. Couldn't refresh from Riot: ${body.error || `HTTP ${res.status}`}`, 'info');
-        loadOrgCards(cachedBody.riotId, cachedBody.region);
-        return;
-      }
-      view.set = body.currentSet;
-      view.expanded = false;
-      render(body);
-      historyNotice(body);
-      loadOrgCards(body.riotId, body.region);
-      if (body.history.syncing) pollHistory(riotId, region);
+      p = await loadMeProfile(me);
     } catch (err) {
-      if (err.api) {
-        notice(err.message, 'error');
-        if (!view.profile) render(SAMPLE);
-      } else {
-        notice('Pipeline API not reachable: showing sample data. Start it with "npm run dev" and open http://localhost:4000.');
-        render(SAMPLE);
-      }
-    } finally {
-      $('app').classList.remove('loading');
+      return renderSetup(`Couldn't load ${me.riotId}: ${err.message}`);
+    }
+    const href = Veridium.playerHref(p.riotId, p.region);
+    const rank = p.rank ? fmtRank(p.rank) : 'Unranked';
+    const set = p.currentSet ? `Set ${p.currentSet}` : 'This set';
+    $('me').innerHTML = `
+      <div class="me-banner"></div>
+      <div class="me-body">
+        <a href="${esc(href)}" class="avatar" style="color:#fff">${esc(p.riotId.charAt(0).toUpperCase())}</a>
+        <div class="me-name"><a href="${esc(href)}">${esc(name(p.riotId))}</a> ${VERIFIED}</div>
+        <div class="sub">TFT Player · ${esc(p.region.toUpperCase())} · #${esc(p.riotId.split('#')[1])}</div>
+        <div class="me-rank">${RANK_EMBLEM}<div><b>${esc(rank)}</b><span class="sub">${p.rank ? `${p.rank.leaguePoints} LP · ` : ''}Ranked TFT</span></div></div>
+        <div class="tiles">
+          <div class="tile"><div class="label">Ranked games</div><div class="value">${p.rankedMatches}</div><div class="sub">${esc(set)}</div></div>
+          <div class="tile"><div class="label">Top-4 rate</div><div class="value">${p.totalMatches ? pct(p.winRate) : '–'}</div><div class="sub">${esc(set)}</div></div>
+        </div>
+      </div>`;
+    $('composerAvatar').textContent = p.riotId.charAt(0).toUpperCase();
+    $('shareMatch').href = `${href}#matches`;
+    $('myGames').hidden = false;
+    $('myGamesList').innerHTML = `
+      <a class="game-row" href="${esc(href)}#games" style="color:inherit">
+        <span class="game-icon sm">TFT</span>
+        <div><b>Teamfight Tactics</b><div class="sub">${esc(rank)} · ${p.totalMatches ? `Top-4 ${pct(p.winRate)}` : 'no games this set'}</div></div>
+      </a>
+      <div class="sub" style="margin-top:6px">League of Legends, Valorant and more are on the way.</div>`;
+    renderQuickLinks(me);
+  }
+
+  // ---- Center: feed ----
+  function sessionPost(s) {
+    const p = s.player;
+    const href = profileUrl(p);
+    const queue = s.rankedGames === s.games.length ? 'ranked' : s.rankedGames ? '' : 'normal';
+    const games = `${s.games.length} ${queue ? queue + ' ' : ''}game${s.games.length === 1 ? '' : 's'}`;
+    const top4 = s.games.filter((g) => g.placement <= 4).length;
+    return `<article class="card pad">
+      <div class="post-head">
+        <a class="mini-avatar" href="${esc(href)}">${esc(p.riotId.charAt(0).toUpperCase())}</a>
+        <div><b><a href="${esc(href)}">${esc(name(p.riotId))}</a></b> ${VERIFIED}
+          <div class="sub">${esc(timeAgo(s.at))} · Teamfight Tactics · Set ${s.set}</div></div>
+      </div>
+      <p class="post-text">Played ${esc(games)} on ${esc(fmtDate(s.date + 'T12:00:00Z'))}. Best finish: <b>${ord(s.best)}</b>.</p>
+      <div class="match-card">
+        <div class="info">
+          <div class="match-top"><span class="game-icon sm">TFT</span>
+            <div><b>${ord(s.best)} Place</b> <span class="sub">best of the day</span></div></div>
+          <div class="match-cols">
+            <span>Rank<b>${esc(p.rank ? fmtRank(p.rank) : 'Unranked')}</b></span>
+            <span>Games<b>${s.games.length}</b></span>
+            <span>Avg. Place<b>${s.avgPlacement.toFixed(1)}</b></span>
+            <span>Top 4<b>${top4}/${s.games.length}</b></span>
+          </div>
+          <div class="chips" aria-label="Placements, newest first">${s.games.map((g) => placeChip(g.placement)).join('')}</div>
+        </div>
+        <div class="art" aria-hidden="true"></div>
+      </div>
+      <div class="post-foot"><span>Verified from Riot match history</span><a href="${esc(href)}#matches">View matches →</a></div>
+    </article>`;
+  }
+
+  function rosterPost(j) {
+    const org = j.organization;
+    const orgHref = `org.html?id=${encodeURIComponent(org.id)}`;
+    return `<article class="card pad">
+      <div class="post-head">
+        <a class="org-chip" href="${esc(orgHref)}">${esc(initials(org.name))}</a>
+        <div><b><a href="${esc(orgHref)}">${esc(org.name)}</a></b>
+          <div class="sub">${esc(timeAgo(j.at))} · Organization · Roster update</div></div>
+      </div>
+      <p class="post-text"><a href="${esc(profileUrl(j.player))}">@${esc(name(j.player.riotId))}</a> joined the ${j.status === 'bench' ? 'bench' : 'roster'} as <b>${esc(j.role)}</b>.</p>
+      <div class="roster-banner">
+        <div class="org-name">${esc(org.name)}</div>
+        <div class="roster-list">
+          <span class="kicker">CURRENT ROSTER</span>
+          ${j.roster.map((m) => `<div><span class="mini-avatar">${esc(m.riotId.charAt(0).toUpperCase())}</span>${esc(name(m.riotId))}<small>${esc(m.role)}</small></div>`).join('')}
+        </div>
+      </div>
+    </article>`;
+  }
+
+  function vacancyPost(v) {
+    const org = v.organization;
+    const orgHref = `org.html?id=${encodeURIComponent(org.id)}`;
+    const x = v.vacancy;
+    return `<article class="card pad">
+      <div class="post-head">
+        <a class="org-chip" href="${esc(orgHref)}">${esc(initials(org.name))}</a>
+        <div><b><a href="${esc(orgHref)}">${esc(org.name)}</a></b>
+          <div class="sub">${esc(timeAgo(v.at))} · Organization · Vacancy</div></div>
+      </div>
+      <p class="post-text">We're recruiting: <b>${esc(x.title)}</b>${x.role ? ` <span class="pill">${esc(x.role)}</span>` : ''}</p>
+      <div class="item" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <div class="sub">${esc(x.game)} · ${esc(x.region)} · ${esc(titleCase(x.level))}</div>
+        ${x.status === 'open' ? '<a class="btn primary small" href="jobs.html">Apply with your verified profile</a>' : '<span class="status closed">closed</span>'}
+      </div>
+    </article>`;
+  }
+
+  const FEED_PAGE = 6;
+  let feedLimit = FEED_PAGE;
+
+  async function renderFeed() {
+    try {
+      const items = await api(`/api/feed?limit=${feedLimit + 1}`); // one extra tells us whether there's more
+      const shown = items.slice(0, feedLimit);
+      $('feed').innerHTML = shown.length
+        ? shown.map((i) => ({ session: sessionPost, roster_join: rosterPost, vacancy: vacancyPost })[i.type](i)).join('') +
+          (items.length > feedLimit ? '<button class="expand" id="moreFeed">Show more activity <span class="chev">▾</span></button>' : '')
+        : '<section class="card pad empty">No activity yet. Load a player profile or post a vacancy and it shows up here.</section>';
+      $('moreFeed')?.addEventListener('click', () => {
+        feedLimit += FEED_PAGE;
+        renderFeed();
+      });
+    } catch (err) {
+      $('feed').innerHTML = `<section class="card pad empty">${esc(err.message)}</section>`;
     }
   }
 
-  $('seasonTabs').addEventListener('click', (e) => {
-    const b = e.target.closest('button');
-    if (!b || !view.profile) return;
-    view.set = Number(b.dataset.set);
-    view.expanded = false;
-    renderSeasonTabs();
-    renderSeasonStats();
-    renderMatches();
-  });
+  // ---- Right column ----
+  async function renderRight() {
+    const [vacancies, players] = await Promise.all([api('/api/vacancies').catch(() => []), api('/api/players').catch(() => [])]);
+    $('vacancies').innerHTML = vacancies.length ? vacancies.slice(0, 4).map((v) => `
+      <div class="row-item">
+        <span class="org-chip" style="width:38px;height:38px;font-size:13px">${esc(initials(v.organizationName))}</span>
+        <div class="grow"><b>${esc(v.title)}</b><span class="sub">${esc(v.organizationName)} · ${esc(v.game)} · ${esc(v.region)}</span></div>
+        <a class="btn small" href="jobs.html">Apply</a>
+      </div>`).join('') : '<div class="sub">No open vacancies right now.</div>';
+    $('players').innerHTML = players.length ? players.slice(0, 5).map((p) => `
+      <div class="row-item">
+        <span class="mini-avatar" style="width:38px;height:38px">${esc(p.riotId.charAt(0).toUpperCase())}</span>
+        <div class="grow"><b>${esc(name(p.riotId))} <span class="verified">✔</span></b><span class="sub">TFT · ${esc(p.rank ? fmtRank(p.rank) : 'Unranked')} · ${esc(p.region.toUpperCase())}</span></div>
+        <a class="btn small" href="${esc(profileUrl(p))}">View</a>
+      </div>`).join('') : '<div class="sub">No players loaded yet.</div>';
+    const tracked = players.length;
+    $('games').innerHTML = [['TFT', 'TFT', `${tracked} player${tracked === 1 ? '' : 's'}`, true], ['LoL', 'LoL', 'Soon'], ['VAL', 'Valorant', 'Soon'], ['OW2', 'OW2', 'Soon'], ['CS2', 'CS2', 'Soon']]
+      .map(([abbr, label, note, live]) => `<div><span class="game-icon ${live ? '' : 'muted'}">${abbr}</span><b>${label}</b>${note}</div>`).join('');
+  }
 
-  $('queueFilter').addEventListener('click', (e) => {
-    const b = e.target.closest('button');
-    if (!b) return;
-    view.queue = b.dataset.q;
-    view.expanded = false;
-    document.querySelectorAll('#queueFilter button').forEach((x) => x.classList.toggle('on', x === b));
-    if (view.profile) renderMatches();
-  });
-
-  $('expand').addEventListener('click', () => {
-    view.expanded = !view.expanded;
-    renderMatches();
-  });
-
-  $('search').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const id = $('riotId').value.trim();
-    if (id) load(id, $('region').value);
-  });
-
-  const params = new URLSearchParams(location.search);
-  const initialId = params.get('riotId') || 'WompCat#NA1';
-  const initialRegion = params.get('region') || 'na1';
-  $('riotId').value = initialId;
-  $('region').value = initialRegion;
-  load(initialId, initialRegion);
+  window.addEventListener('hashchange', () => { if (location.hash === '#me') { Veridium.clearMe(); renderSetup(); } });
+  if (location.hash === '#me' && !Veridium.getMe()) renderSetup(); else renderLeft();
+  renderFeed();
+  renderRight();
 </script>
 </body>
 </html>

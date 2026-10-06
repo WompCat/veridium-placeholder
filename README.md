@@ -17,7 +17,8 @@ copy .env.example .env      # then paste your RIOT_API_KEY into .env
 npm run seed                # creates the Obscurity Esports org record (safe to re-run)
 npm test                    # mocked Riot responses, no key needed
 npm run ingest -- "WompCat#NA1" na1   # one live ingestion run, prints the profile JSON
-npm run dev                 # http://localhost:4000/?riotId=WompCat%23NA1&region=na1
+npm run dev                 # http://localhost:4000/  (home)
+                            # http://localhost:4000/player.html?riotId=WompCat%23NA1&region=na1
                             # http://localhost:4000/org.html?id=obscurity-esports
 ```
 
@@ -77,7 +78,7 @@ each tracked season, newest first, with its own stats and every match.
 | `src/tft/ingest.ts` | orchestrates one player's ingestion run and the season backfill |
 | `src/tft/transform.ts` | raw Riot JSON → `Matchup` / rank snapshot |
 | `src/tft/aggregate.ts` | `Matchup[]` + snapshots → profile stats |
-| `src/routes/players.ts`, `src/server.ts` | Express endpoint + static Player Profile page (`public/index.html`) |
+| `src/routes/players.ts`, `src/server.ts` | Express endpoints + the static pages in `public/` (see Pages below) |
 | `src/cli.ts` | `npm run ingest -- "Name#TAG" [region]` |
 | `migrations/` | numbered `.sql` files applied in order on startup (see below) |
 
@@ -90,6 +91,31 @@ each tracked season, newest first, with its own stats and every match.
   Otherwise the value is `null` and the UI shows "—". These fill in as the profile is loaded more often.
 - **Highest rank** is the highest snapshot Veridium has recorded, not the player's all-time peak.
 - **Percentile** is `null` because Riot doesn't provide one.
+
+## Pages
+
+All pages share one header (`public/shell.js`): search, plus Home / Players / Organizations /
+Tournaments / Jobs. Searching a full Riot ID (`Name#TAG`) opens that profile, and any other text
+searches the directory.
+
+| Page | |
+| --- | --- |
+| `/` Home | your profile card, an activity feed, open vacancies, players, games |
+| `/players.html` | directory of verified players (+ matching orgs), and lookup by Riot ID |
+| `/player.html?riotId=…&region=…` | Player Profile: Overview, Games (season tabs), Matches, Tournaments, Stats, About |
+| `/organizations.html` | directory of organizations |
+| `/org.html?id=…` | Org Dashboard: Overview, Roster, Scrims, Vacancies, Settings |
+| `/tournaments.html` | coming-soon placeholder |
+| `/jobs.html` | open vacancies; apply with a Riot ID |
+
+**"Me" without accounts.** The Riot ID you set on Home, or with "This is me" on a profile, is
+remembered in this browser (localStorage). It drives the Home profile card and the header avatar.
+It's a convenience, not a login: anyone can still view and apply as any Riot ID.
+
+**Nothing on the home screen is invented.** The feed is built from real events (`GET /api/feed`):
+each player's TFT games grouped by day, roster signings, and vacancy postings. Posting, likes,
+comments, follows and esports news don't exist yet, so those parts of the mockup are either
+replaced with real data (open vacancies, players on Veridium) or clearly marked "coming soon".
 
 ## Organizations & vacancies
 
@@ -107,6 +133,7 @@ their profile.
 
 | Endpoint | |
 | --- | --- |
+| `GET /api/organizations` | every org with roster size and open vacancies |
 | `GET /api/organizations/:id` | org name and roster size |
 | `GET /api/organizations/:id/roster` | active then bench members, each with `player` stats |
 | `POST /api/organizations/:id/roster` | `{ playerPuuid \| riotId+region, role, status? }` |
@@ -121,6 +148,8 @@ their profile.
 | `PATCH /api/applications/:id` | `{ status: accepted \| rejected, addToRoster? = true, role?, rosterStatus? }` |
 | `POST /api/applications/:id/roster` | add an accepted applicant: `{ role? = vacancy role or title, status? = active }` |
 | `GET /api/players/:region/:riotId/applications` | a player's own applications with vacancy, org and status |
+| `GET /api/players` | every loaded player with verified stats, highest rank first |
+| `GET /api/feed?limit=` | home feed: TFT sessions (one per player per day), roster joins, vacancies |
 
 Players must already be cached by the pipeline (their profile loaded once) before they can be
 rostered or apply. Otherwise the API returns 404. The Org Dashboard and Jobs pages load the

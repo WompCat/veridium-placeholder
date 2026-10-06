@@ -1,4 +1,5 @@
 import { Router, type ErrorRequestHandler, type Request } from 'express';
+import { buildFeed, listPlayerSummaries } from '../feed';
 import { badRequest, HttpError, notFound } from '../orgs/errors';
 import { playerSummary } from '../orgs/players';
 import type { NewVacancy, OrgRepo, VacancyPatch } from '../orgs/repo';
@@ -87,6 +88,10 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
 export function organizationsRouter(deps: OrgDeps): Router {
   const { orgs } = deps;
   const router = Router();
+
+  router.get('/', (_req, res) => {
+    res.json(orgs.listOrganizations());
+  });
 
   router.get('/:id', (req, res) => {
     const org = orgs.requireOrganization(req.params.id);
@@ -240,14 +245,31 @@ export function applicationsRouter(deps: OrgDeps): Router {
   return router;
 }
 
-/** /api/players/:region/:riotId/applications: a player's own applications and their status (cache only). */
+/** /api/players: the directory of verified players, and each player's own applications (cache only). */
 export function playerApplicationsRouter(deps: OrgDeps): Router {
   const router = Router();
+
+  router.get('/', (_req, res) => {
+    res.json(listPlayerSummaries(deps));
+  });
 
   router.get('/:region/:riotId/applications', (req, res) => {
     const { gameName, tagLine } = parseRiotId(req.params.riotId);
     const player = deps.store.findPlayer(gameName, tagLine, req.params.region);
     res.json(player ? deps.orgs.listPlayerApplications(player.puuid) : []);
+  });
+
+  router.use(errorHandler);
+  return router;
+}
+
+/** /api/feed: recent platform activity for the home screen (cache only, no Riot calls). */
+export function feedRouter(deps: OrgDeps): Router {
+  const router = Router();
+
+  router.get('/', (req, res) => {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 50);
+    res.json(buildFeed(deps, limit));
   });
 
   router.use(errorHandler);
