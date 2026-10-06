@@ -14,6 +14,27 @@
   .kpi b { display: block; font-size: 22px; }
   .kpi span { font-size: 12px; opacity: .8; }
   .banner .kpis { flex: 1 1 340px; max-width: 380px; }
+  main.org { grid-template-columns: minmax(0, 1fr); }
+  [data-view][hidden] { display: none; } /* .stack/.split set display, which would override [hidden] */
+  .tabs button { border: 0; background: none; font: inherit; padding: 14px 0; color: var(--muted); font-weight: 500; white-space: nowrap; cursor: pointer; }
+  .tabs button.on { color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
+  .tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
+  .activity { display: grid; gap: 0; }
+  .activity div { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .activity div:last-child { border-bottom: 0; }
+  .activity .dot { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; flex: none; background: var(--accent-soft); }
+  .activity .when { margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .soon { text-align: center; padding: 48px 20px; }
+  .soon .icon { font-size: 40px; }
+  .soon h2 { font-size: 20px; margin: 10px 0 6px; }
+  .settings-rows { display: grid; gap: 0; margin-top: 8px; }
+  .settings-rows div { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .settings-rows div:last-child { border-bottom: 0; }
+  .settings-rows dt { color: var(--muted); }
+  .settings-rows dd { margin: 0; overflow-wrap: anywhere; }
+  @media (max-width: 960px) { .split { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 640px) { .stats.four { grid-template-columns: 1fr 1fr; } .settings-rows div { grid-template-columns: 1fr; gap: 2px; } }
 </style>
 </head>
 <body>
@@ -26,49 +47,82 @@
   <div class="nav-links"><a href="/">Players</a><a class="active" href="org.html?id=obscurity-esports">Organizations</a><span>Tournaments</span><a href="jobs.html">Jobs</a></div>
 </nav>
 
-<main id="app">
+<main id="app" class="org">
   <div class="notice error" id="notice" hidden></div>
 
-  <div class="stack">
-    <section class="card">
-      <div class="banner">
-        <div class="org-logo" id="orgLogo">?</div>
-        <div class="who">
-          <h1 id="orgName">Loading…</h1>
-          <div class="meta">Organization · Org Dashboard</div>
-        </div>
-        <div class="kpis">
-          <div class="kpi"><b id="kActive">–</b><span>Active</span></div>
-          <div class="kpi"><b id="kBench">–</b><span>Bench</span></div>
-          <div class="kpi"><b id="kOpen">–</b><span>Open roles</span></div>
-        </div>
+  <section class="card">
+    <div class="banner">
+      <div class="org-logo" id="orgLogo">?</div>
+      <div class="who">
+        <h1 id="orgName">Loading…</h1>
+        <div class="meta">Organization · Org Dashboard</div>
       </div>
-      <div class="tabs"><span>Overview</span><a class="on" href="#roster-panel">Roster</a><span>Scrims</span><a href="#vacancies-panel">Vacancies</a><span>Settings</span></div>
-    </section>
+      <div class="kpis">
+        <div class="kpi"><b id="kActive">–</b><span>Active</span></div>
+        <div class="kpi"><b id="kBench">–</b><span>Bench</span></div>
+        <div class="kpi"><b id="kOpen">–</b><span>Open roles</span></div>
+      </div>
+    </div>
+    <div class="tabs" role="tablist" id="tabs">
+      <button role="tab" data-tab="overview" aria-controls="view-overview">Overview</button>
+      <button role="tab" data-tab="roster" aria-controls="view-roster">Roster</button>
+      <button role="tab" data-tab="scrims" aria-controls="view-scrims">Scrims</button>
+      <button role="tab" data-tab="vacancies" aria-controls="view-vacancies">Vacancies</button>
+      <button role="tab" data-tab="settings" aria-controls="view-settings">Settings</button>
+    </div>
+  </section>
 
-    <section class="card pad" id="roster-panel">
-      <div class="table-head">
-        <div><h2>Roster</h2><div class="sub">Stats are verified from official Riot APIs and update as players are loaded.</div></div>
+  <!-- Overview -->
+  <div class="stack" id="view-overview" role="tabpanel" data-view="overview" hidden>
+    <section class="card pad">
+      <h2>Summary</h2>
+      <div class="stats four" style="margin-top:14px">
+        <div class="stat"><div class="label">Active players</div><div class="value" id="oActive">–</div><div class="hint"><a href="#roster">View roster</a></div></div>
+        <div class="stat"><div class="label">Bench</div><div class="value" id="oBench">–</div><div class="hint">Subs and reserves</div></div>
+        <div class="stat"><div class="label">Open roles</div><div class="value" id="oOpen">–</div><div class="hint"><a href="#vacancies">Manage vacancies</a></div></div>
+        <div class="stat"><div class="label">Pending applications</div><div class="value" id="oPending">–</div><div class="hint" id="oPendingHint">Waiting for review</div></div>
       </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Player</th><th>Rank</th><th>Win Rate</th><th>Role</th><th>Status</th><th>Joined</th><th></th></tr></thead>
-          <tbody id="roster"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
-        </table>
-      </div>
-      <hr class="divider" />
-      <h2 style="font-size:14px;margin-bottom:10px">Add a player</h2>
-      <form class="form-row" id="addForm">
-        <label class="field">Riot ID<input name="riotId" placeholder="Name#TAG" required /></label>
-        <label class="field" style="flex:0 1 90px">Region<select name="region"></select></label>
-        <label class="field">Role<input name="role" placeholder="e.g. TFT, Flex, Sub" required maxlength="40" list="roleOptions" /></label>
-        <label class="field" style="flex:0 1 110px">Status<select name="status"><option value="active">Active</option><option value="bench">Bench</option></select></label>
-        <button class="btn primary">Add to roster</button>
-      </form>
-      <div class="form-msg" id="addMsg"></div>
     </section>
+    <section class="card pad">
+      <h2>Recent activity</h2>
+      <div class="sub">Roster changes, postings and applications, newest first.</div>
+      <div class="activity" id="activity" style="margin-top:8px"><div class="empty">Loading…</div></div>
+    </section>
+  </div>
 
-    <section class="card pad" id="vacancies-panel">
+  <!-- Roster -->
+  <section class="card pad" id="view-roster" role="tabpanel" data-view="roster" hidden>
+    <div class="table-head">
+      <div><h2>Roster</h2><div class="sub">Stats are verified from official Riot APIs and update as players are loaded.</div></div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Player</th><th>Rank</th><th>Win Rate</th><th>Role</th><th>Status</th><th>Joined</th><th></th></tr></thead>
+        <tbody id="roster"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+    <hr class="divider" />
+    <h2 style="font-size:14px;margin-bottom:10px">Add a player</h2>
+    <form class="form-row" id="addForm">
+      <label class="field">Riot ID<input name="riotId" placeholder="Name#TAG" required /></label>
+      <label class="field" style="flex:0 1 90px">Region<select name="region"></select></label>
+      <label class="field">Role<input name="role" placeholder="e.g. TFT, Flex, Sub" required maxlength="40" list="roleOptions" /></label>
+      <label class="field" style="flex:0 1 110px">Status<select name="status"><option value="active">Active</option><option value="bench">Bench</option></select></label>
+      <button class="btn primary">Add to roster</button>
+    </form>
+    <div class="form-msg" id="addMsg"></div>
+  </section>
+
+  <!-- Scrims: on hold this pass -->
+  <section class="card pad soon" id="view-scrims" role="tabpanel" data-view="scrims" hidden>
+    <div class="icon" aria-hidden="true">🗓️</div>
+    <h2>Scrims are coming soon</h2>
+    <div class="sub">Scheduling practice matches with other orgs, with availability polling, will live here.</div>
+  </section>
+
+  <!-- Vacancies -->
+  <div class="split" id="view-vacancies" role="tabpanel" data-view="vacancies" hidden>
+    <section class="card pad">
       <div class="table-head">
         <div><h2>Vacancies</h2><div class="sub">Players apply with their verified profile. Applicants show live stats, not a form submission.</div></div>
       </div>
@@ -76,9 +130,6 @@
       <button class="expand" id="showClosed" aria-expanded="false" hidden></button>
       <div class="list" id="closedVacancies" style="margin-top:12px" hidden></div>
     </section>
-  </div>
-
-  <aside class="stack">
     <section class="card pad">
       <h2>Post a vacancy</h2>
       <div class="sub" style="margin-bottom:14px">It appears on the Jobs page right away.</div>
@@ -92,7 +143,15 @@
       </form>
       <div class="form-msg" id="vacancyMsg"></div>
     </section>
-  </aside>
+  </div>
+
+  <!-- Settings -->
+  <section class="card pad" id="view-settings" role="tabpanel" data-view="settings" hidden>
+    <h2>Organization settings</h2>
+    <div class="sub">Editing these comes with org accounts. Until then they're read-only.</div>
+    <dl class="settings-rows" id="settings"></dl>
+  </section>
+
   <datalist id="roleOptions"><option>Player</option><option>Flex</option><option>Sub</option><option>Coach</option><option>Analyst</option><option>Manager</option></datalist>
 </main>
 
@@ -105,6 +164,31 @@
   let showClosed = false;
   let roster = [];
   let vacancies = [];
+  let org = null;
+  const TABS = ['overview', 'roster', 'scrims', 'vacancies', 'settings'];
+
+  // Tabs: the hash (#roster) picks the view, so tabs are linkable and work with back/forward.
+  function currentTab() {
+    const tab = location.hash.slice(1);
+    return TABS.includes(tab) ? tab : 'overview';
+  }
+
+  function showTab() {
+    const tab = currentTab();
+    for (const b of document.querySelectorAll('#tabs button')) {
+      const on = b.dataset.tab === tab;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-selected', String(on));
+    }
+    for (const v of document.querySelectorAll('[data-view]')) v.hidden = v.dataset.view !== tab;
+  }
+
+  $('tabs').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-tab]');
+    if (b) location.hash = b.dataset.tab;
+  });
+  window.addEventListener('hashchange', showTab);
+  showTab();
 
   document.querySelector('#addForm select[name=region]').innerHTML = regionOptions();
 
@@ -218,8 +302,49 @@
     $('closedVacancies').innerHTML = closed.map((v) => vacancyCard(v, applicants[v.id])).join('');
   }
 
+  // Overview: header counts plus pending applications, and a recent-activity feed built from
+  // roster joins, vacancy postings and applications.
+  async function renderOverview() {
+    const active = roster.filter((m) => m.status === 'active').length;
+    const open = vacancies.filter((v) => v.status === 'open').length;
+    const pending = vacancies.reduce((n, v) => n + v.pendingCount, 0);
+    $('oActive').textContent = active;
+    $('oBench').textContent = roster.length - active;
+    $('oOpen').textContent = open;
+    $('oPending').textContent = pending;
+    $('oPendingHint').innerHTML = pending ? '<a href="#vacancies">Review applicants</a>' : 'Nothing waiting';
+
+    const applications = (await Promise.all(vacancies.map(async (v) =>
+      (await api(`/api/vacancies/${v.id}/applications`)).map((a) => ({ ...a, vacancy: v }))))).flat();
+    const name = (p) => esc(p.riotId.split('#')[0]);
+    const events = [
+      ...roster.map((m) => ({ at: m.joinedAt, icon: '👤', text: `<b>${name(m.player)}</b> joined the roster as ${esc(m.role)}${m.status === 'bench' ? ' (bench)' : ''}` })),
+      ...vacancies.map((v) => ({ at: v.postedAt, icon: '📌', text: `Posted <b>${esc(v.title)}</b>${v.status === 'closed' ? ' · now closed' : ''}` })),
+      ...applications.map((a) => ({
+        at: a.appliedAt,
+        icon: { pending: '📨', accepted: '✅', rejected: '✖️' }[a.status],
+        text: `<b>${name(a.player)}</b> applied to ${esc(a.vacancy.title)}${a.status === 'pending' ? '' : ` · ${esc(a.status)}`}`,
+      })),
+    ].sort((x, y) => y.at.localeCompare(x.at)).slice(0, 8);
+    $('activity').innerHTML = events.length
+      ? events.map((e) => `<div><span class="dot" aria-hidden="true">${e.icon}</span><span>${e.text}</span><span class="when">${esc(fmtDate(e.at))}</span></div>`).join('')
+      : '<div class="empty">No activity yet. Add players or post a vacancy to get started.</div>';
+  }
+
+  function renderSettings() {
+    const rows = [
+      ['Name', esc(org.name)],
+      ['Logo', `<span class="org-logo" style="width:44px;height:44px;font-size:16px;border-width:2px;color:#fff">${esc($('orgLogo').textContent)}</span> <span class="sub">Generated from the name. Uploads come later.</span>`],
+      ['Organization ID', `<code>${esc(org.id)}</code>`],
+      ['Dashboard link', `<a href="org.html?id=${encodeURIComponent(org.id)}">${esc(location.origin)}/org.html?id=${esc(org.id)}</a>`],
+      ['Created', esc(fmtDate(org.createdAt))],
+    ];
+    $('settings').innerHTML = rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
+  }
+
   async function refresh() {
     await Promise.all([loadRoster(), loadVacancies()]);
+    await renderOverview();
   }
 
   async function act(fn) {
@@ -302,7 +427,7 @@
       await api(`${base}/roster`, { method: 'POST', body: { riotId: profile.riotId, region: profile.region, role: f.role, status: f.status } });
       setMsg($('addMsg'), `Added ${profile.riotId}.`, 'ok');
       e.target.reset();
-      await loadRoster();
+      await refresh();
     } catch (err) {
       setMsg($('addMsg'), err.message, 'error');
     } finally {
@@ -317,7 +442,7 @@
       await api(`${base}/vacancies`, { method: 'POST', body: f });
       setMsg($('vacancyMsg'), `Posted "${f.title}".`, 'ok');
       e.target.reset();
-      await loadVacancies();
+      await refresh();
     } catch (err) {
       setMsg($('vacancyMsg'), err.message, 'error');
     }
@@ -325,10 +450,11 @@
 
   (async () => {
     try {
-      const org = await api(base);
+      org = await api(base);
       $('orgName').textContent = org.name;
       $('orgLogo').textContent = org.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
       document.title = `${org.name} · Veridium`;
+      renderSettings();
       await refresh();
     } catch (err) {
       $('orgName').textContent = 'Organization not found';

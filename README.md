@@ -146,3 +146,41 @@ unchanged. To change the schema, add the next numbered file. Never edit one that
 - **Free vs paid vacancy postings.** There's no `plan` / `billingStatus` on `Organization` yet. Add
   it in a new migration once that's decided.
 - **Obscurity Esports** is created by `npm run seed`, not by a migration, so it's easy to change or drop.
+
+## Deploying (Render)
+
+The app is one Node process plus a sqlite file, so it needs a host with a **persistent disk**.
+Serverless hosts (Vercel, Netlify functions) won't work, because the database would vanish
+between requests. The repo is set up for [Render](https://render.com):
+
+- `veridium-pipeline/Dockerfile` builds the app. On every boot it applies new migrations, runs
+  the idempotent seed, and starts the server.
+- `render.yaml` (a Render Blueprint) declares the web service, a 1 GB disk mounted at
+  `/var/data`, `DB_PATH=/var/data/veridium.db` on that disk, and the env vars to fill in.
+  Disks need a paid instance type, so the Blueprint uses `starter`. Check Render's current pricing.
+
+**First deploy**
+
+1. Get this work onto `main`, since the Blueprint deploys `main`. The repo has no `main` yet, so create
+   it from this branch on GitHub (or merge into it once it exists).
+2. In Render: **New → Blueprint**, connect the `veridium-placeholder` GitHub repo, and apply.
+3. When prompted, set **`RIOT_API_KEY`** (the bare `RGAPI-…` key) and **`SITE_PASSWORD`**.
+4. Render builds the image and gives you an `https://veridium-….onrender.com` URL. Visit
+   `/api/health` (open without the password), then `/org.html?id=obscurity-esports`.
+
+**Production settings**
+
+| Variable | |
+| --- | --- |
+| `RIOT_API_KEY` | set in Render's dashboard; never committed (`.env` is gitignored) |
+| `DB_PATH` | `/var/data/veridium.db`, which must sit on the disk mount or data is lost on redeploy |
+| `SEASONS` | `3` |
+| `SITE_PASSWORD` | puts the whole site behind a browser password prompt. There are no accounts yet, so without it anyone with the URL can edit rosters and use up the Riot key's rate limit |
+| `PORT` | injected by Render; the app reads `process.env.PORT` (4000 is only the local default) |
+| `HOST` | `0.0.0.0` by default, so Render can route traffic in |
+
+**Daily key rotation.** A Riot development key expires every 24 hours, on the deployed site too.
+Update `RIOT_API_KEY` in Render each day (Render restarts the service with the new value), or
+profile lookups fail for every visitor. Cached profiles still display, with a notice. A Riot
+production key is the only permanent fix, and the deployed prototype is good evidence for that
+application.
