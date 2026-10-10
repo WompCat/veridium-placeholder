@@ -142,6 +142,9 @@
         <label class="field" style="flex-basis:100%">Level<select name="level"><option value="competitive">Competitive</option><option value="casual">Casual</option></select></label>
         <button class="btn primary" style="flex-basis:100%">Post vacancy</button>
       </form>
+      <p class="sub" style="margin:12px 0 0;line-height:1.5">Players can be 16 or 17. Any offer or contract with a player under 18
+        needs their parent's or guardian's consent, which your organization is responsible for getting.
+        <a href="terms.html#minors">Terms: players under 18</a></p>
       <div class="form-msg" id="vacancyMsg"></div>
     </section>
   </div>
@@ -264,7 +267,8 @@
         <button class="btn primary" name="add" value="1">Accept &amp; add to roster</button>
         <button class="btn" name="add" value="0">Accept only</button>
         <button class="btn" type="button" data-act="cancel">Cancel</button>
-      </form></td></tr>`;
+      </form>
+      <div class="sub" style="margin-top:8px">Accepting isn't a contract. If this player is under 18, any offer needs their parent's or guardian's consent (<a href="terms.html#minors">your responsibility</a>).</div></td></tr>`;
   }
 
   function applicantsTable(apps, v) {

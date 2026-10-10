@@ -148,7 +148,7 @@ Any logged-in account can **create an organization** (Organizations page) and be
 
 **Terms of Service and Privacy Policy.** `/terms.html` and `/privacy.html` describe what the code
 actually does (what's collected, who sees what, the one session cookie, deletion). Sign-up needs a
-"I'm at least 13 and I agree" checkbox; the accepted version and time are stored on the account.
+"I'm at least 16 and I agree" checkbox; the accepted version and time are stored on the account.
 The version lives in `src/legal.ts` (`TERMS_VERSION`): bump it, and the dates on both pages, when
 either changes materially, and every account is asked to accept again before anything that needs a
 login works (the API answers `403` with `code: "terms_required"`). Accounts can be deleted from
