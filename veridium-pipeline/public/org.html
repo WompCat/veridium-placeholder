@@ -322,7 +322,8 @@
       ...roster.map((m) => ({ at: m.joinedAt, icon: '👤', text: `<b>${name(m.player)}</b> joined the roster as ${esc(m.role)}${m.status === 'bench' ? ' (bench)' : ''}` })),
       ...vacancies.map((v) => ({ at: v.postedAt, icon: '📌', text: `Posted <b>${esc(v.title)}</b>${v.status === 'closed' ? ' · now closed' : ''}` })),
       // Only accepted applications are activity; pending ones live in the applicant review, rejections stay private.
-      ...applications.filter((a) => a.status === 'accepted').map((a) => ({
+      // A player who was also added to the roster already shows as "joined the roster".
+      ...applications.filter((a) => a.status === 'accepted' && !roster.some((m) => m.player.puuid === a.player.puuid)).map((a) => ({
         at: a.appliedAt,
         icon: '✅',
         text: `<b>${name(a.player)}</b> was accepted for ${esc(a.vacancy.title)}`,

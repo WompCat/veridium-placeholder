@@ -618,7 +618,7 @@
       ['Current rank', esc(p.rank ? `${fmtRank(`${p.rank.tier} ${p.rank.division}`)} · ${p.rank.leaguePoints} LP` : 'Unranked')],
       ['Match history', `${total} matches across ${seasons.map((s) => esc(s.label)).join(', ') || 'no seasons yet'}${p.history?.complete ? '' : ' (still loading)'}`],
       ['Data sources', 'Riot Games API: account-v1, tft-match-v1, tft-league-v1, and for League of Legends lol-match-v5, lol-league-v4'],
-      ['Applications', '<a href="#applications">See this player\'s applications</a>'],
+      ...(isOwnProfile() ? [['Applications', '<a href="#applications">See your applications</a>']] : []),
     ];
     $('aboutRows').innerHTML = rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
   }
@@ -672,6 +672,8 @@
     if (!view.profile) return;
     Veridium.setMe(view.profile.riotId, view.profile.region);
     renderMeButton();
+    renderAbout();
+    loadOrgCards(view.profile.riotId, view.profile.region); // your own applications become visible
   });
   function renderMeButton() {
     const me = Veridium.getMe();
@@ -807,6 +809,12 @@
     return data;
   };
 
+  // Application outcomes are private: only the player (this browser's "me") and the org see them.
+  function isOwnProfile() {
+    const me = Veridium.getMe();
+    return !!(me && view.profile && me.riotId.toLowerCase() === view.profile.riotId.toLowerCase() && me.region === view.profile.region);
+  }
+
   async function loadOrgCards(riotId, region) {
     const playerPath = `/api/players/${encodeURIComponent(region)}/${encodeURIComponent(riotId)}`;
     try {
@@ -822,7 +830,8 @@
   }
 
   function renderApplications(apps) {
-    $('applications').hidden = !apps.length;
+    $('applications').hidden = !apps.length || !isOwnProfile();
+    if ($('applications').hidden) { $('appList').innerHTML = ''; return; }
     $('appList').innerHTML = apps.map((a) => {
       const note = a.status === 'accepted'
         ? (a.onRoster ? 'Accepted · on the roster' : 'Accepted · the org will add you to the roster')
@@ -839,7 +848,8 @@
   }
 
   function renderOpenings(openings, apps, riotId, region) {
-    const applied = new Map(apps.map((a) => [a.vacancyId, a.status]));
+    // Visitors only see that the player applied, never the decision.
+    const applied = new Map(apps.map((a) => [a.vacancyId, isOwnProfile() ? a.status : 'pending']));
     const shown = openings.slice(0, OPENINGS_SHOWN);
     $('openings').hidden = !shown.length;
     $('openingList').innerHTML = shown.map((v) => `
