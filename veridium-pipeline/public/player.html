@@ -71,7 +71,7 @@
             <svg class="check" viewBox="0 0 24 24" aria-label="Verified"><circle cx="12" cy="12" r="11" fill="#4f7bff"/><path d="M7 12.5l3.2 3.2L17 9" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </h1>
           <div class="meta" id="meta">TFT Player</div>
-          <div class="tags">Competitive · Ranked TFT · Verified by Riot</div>
+          <div class="tags" id="tags">Competitive · Ranked TFT · Verified by Riot</div>
           <div class="banner-actions">
             <button class="ghost" id="share" type="button">🔗 Share Profile</button>
             <button class="ghost" id="thisIsMe" type="button">⭐ This is me</button>
@@ -357,6 +357,7 @@
       b.setAttribute('aria-selected', String(b.dataset.game === view.game));
     }
     if (tab === 'games' && view.game === 'lol') ensureLol();
+    renderBanner();
   }
   $('tabs').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-tab]');
@@ -474,6 +475,7 @@
     $('lolMore').hidden = l.matches.length <= view.lolShown;
     $('lolMore').innerHTML = `Show ${Math.min(20, l.matches.length - view.lolShown)} more <span class="chev">▾</span>`;
 
+    renderBanner();
     $('ovLolNote').textContent = `Ranked this season (${l.season})`;
     $('ovLolStats').innerHTML = [
       tile('Solo/Duo', esc(l.ranks.solo ? fmtRank(`${l.ranks.solo.tier} ${l.ranks.solo.division}`) : 'Unranked'), l.ranks.solo ? `${l.ranks.solo.leaguePoints} LP` : 'Ranked Solo/Duo'),
@@ -606,24 +608,36 @@
     const [name, tag] = p.riotId.split('#');
     $('name').textContent = name;
     $('avatar').textContent = name.charAt(0).toUpperCase();
-    $('meta').textContent = `TFT Player · ${p.region.toUpperCase()} · #${tag}`;
     $('regionText').textContent = p.region.toUpperCase();
     document.title = `${name} · Veridium`;
-
-    if (p.rank) {
-      const apex = ['MASTER', 'GRANDMASTER', 'CHALLENGER'].includes(p.rank.tier);
-      $('rankText').textContent = fmtRank(apex ? p.rank.tier : `${p.rank.tier} ${p.rank.division}`);
-      $('rankSub').textContent = p.rank.percentile != null
-        ? `TFT Ranked · Top ${pct(p.rank.percentile)}` : `TFT Ranked · ${p.rank.leaguePoints} LP`;
-      $('lp').textContent = `${p.rank.leaguePoints} LP`;
-    } else {
-      $('rankText').textContent = 'Unranked';
-      $('rankSub').textContent = 'TFT Ranked';
-      $('lp').textContent = '–';
-    }
+    $('lp').textContent = p.rank ? `${p.rank.leaguePoints} LP` : '–';
+    renderBanner();
     const last = p.recentMatches[0];
     $('lastMatch').textContent = last ? `${fmtDate(last.date)} · ${ord(last.placement)} Place` : '–';
     $('top1').textContent = pct(p.top1Rate ?? 0);
+  }
+
+  // The banner follows the game being looked at: League of Legends on the LoL view, TFT otherwise.
+  function renderBanner() {
+    const p = view.profile;
+    if (!p) return;
+    const tag = p.riotId.split('#')[1];
+    const apex = (r) => ['MASTER', 'GRANDMASTER', 'CHALLENGER'].includes(r.tier);
+    const rankName = (r) => fmtRank(apex(r) ? r.tier : `${r.tier} ${r.division}`);
+    const lolView = view.game === 'lol' && currentTab() === 'games' && view.lol;
+    if (lolView) {
+      const solo = view.lol.ranks.solo;
+      $('meta').textContent = `League of Legends Player · ${p.region.toUpperCase()} · #${tag}`;
+      $('tags').textContent = 'Competitive · Ranked Solo/Duo · Verified by Riot';
+      $('rankText').textContent = solo ? rankName(solo) : 'Unranked';
+      $('rankSub').textContent = solo ? `LoL Solo/Duo · ${solo.leaguePoints} LP` : 'LoL Solo/Duo';
+      return;
+    }
+    $('meta').textContent = `TFT Player · ${p.region.toUpperCase()} · #${tag}`;
+    $('tags').textContent = 'Competitive · Ranked TFT · Verified by Riot';
+    $('rankText').textContent = p.rank ? rankName(p.rank) : 'Unranked';
+    $('rankSub').textContent = !p.rank ? 'TFT Ranked'
+      : p.rank.percentile != null ? `TFT Ranked · Top ${pct(p.rank.percentile)}` : `TFT Ranked · ${p.rank.leaguePoints} LP`;
   }
 
   function renderSeasonTabs() {
