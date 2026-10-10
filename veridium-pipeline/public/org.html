@@ -37,6 +37,8 @@
   .split.solo { grid-template-columns: minmax(0, 1fr); }
   /* Management controls are for the org's admins; visitors see the public page. */
   body:not(.org-admin) [data-admin] { display: none !important; }
+  .applicants td[colspan] { white-space: normal; } /* the accept row wraps instead of widening the table */
+  .u18-pill { display: inline-block; margin-top: 4px; padding: 1px 8px; border-radius: 999px; background: #fff4e0; color: #9a5b00; font-size: 11px; font-weight: 700; cursor: help; }
   body:not(.org-admin) .stats.four { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   @media (max-width: 640px) { body:not(.org-admin) .stats.four { grid-template-columns: 1fr 1fr; } }
   @media (max-width: 640px) { .stats.four { grid-template-columns: 1fr 1fr; } .settings-rows div { grid-template-columns: 1fr; gap: 2px; } }
@@ -268,7 +270,9 @@
         <button class="btn" name="add" value="0">Accept only</button>
         <button class="btn" type="button" data-act="cancel">Cancel</button>
       </form>
-      <div class="sub" style="margin-top:8px">Accepting isn't a contract. If this player is under 18, any offer needs their parent's or guardian's consent (<a href="terms.html#minors">your responsibility</a>).</div></td></tr>`;
+      <div class="sub" style="margin-top:8px">${a.under18
+        ? `<b style="color:#9a5b00">This player said they're under 18.</b> Accepting isn't a contract: before any offer, your organization must get their parent's or guardian's consent (<a href="terms.html#minors">Terms</a>).`
+        : `Accepting isn't a contract. If this player is under 18, any offer needs their parent's or guardian's consent (<a href="terms.html#minors">your responsibility</a>).`}</div></td></tr>`;
   }
 
   function applicantsTable(apps, v) {
@@ -278,7 +282,8 @@
       <tbody>${apps.map((a) => `
         <tr>
           ${playerCells(a.player)}
-          <td>${esc(fmtDate(a.appliedAt))}</td>
+          <td>${esc(fmtDate(a.appliedAt))}${a.under18
+            ? `<br><span class="u18-pill" title="Self-reported on this application. Any offer needs a parent's or guardian's consent, which your organization must get first.">Under 18</span>` : ''}</td>
           <td><span class="status ${esc(a.status)}">${esc(a.status)}</span></td>
           <td style="text-align:right">${applicantActions(a, v)}</td>
         </tr>${acceptingId === a.id ? acceptRow(a, v) : ''}`).join('')}</tbody></table></div>`;

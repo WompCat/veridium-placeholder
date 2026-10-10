@@ -76,3 +76,22 @@ function setMsg(el, text, kind) {
 
 const REGIONS = ['na1', 'euw1', 'eun1', 'kr', 'br1', 'la1', 'la2', 'oc1', 'jp1', 'tr1'];
 const regionOptions = (selected) => REGIONS.map((r) => `<option${r === selected ? ' selected' : ''}>${r}</option>`).join('');
+
+/**
+ * The step between "Apply" and sending: an optional, self-reported "I am under 18". Only the
+ * organization the application goes to sees it (see privacy.html#under-18).
+ */
+function applyConfirmForm(vacancyId) {
+  return `<form class="apply-confirm" data-confirm="${esc(vacancyId)}">
+    <label class="u18"><input type="checkbox" name="under18" />
+      <span><b>I am under 18</b> <span class="sub">(optional)</span><br>
+        <span class="sub">Only this organization sees this, so it knows a parent's or guardian's consent is needed before any offer.
+          <a href="privacy.html#under-18" target="_blank" rel="noopener">How it's used</a></span></span></label>
+    <div class="apply-confirm-actions"><button class="btn primary small">Send application</button>
+      <button class="btn small" type="button" data-cancel>Cancel</button></div>
+  </form>`;
+}
+
+function submitApplication(vacancyId, under18) {
+  return api(`/api/vacancies/${encodeURIComponent(vacancyId)}/applications`, { method: 'POST', body: { under18 } });
+}

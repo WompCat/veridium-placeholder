@@ -154,6 +154,13 @@ either changes materially, and every account is asked to accept again before any
 login works (the API answers `403` with `code: "terms_required"`). Accounts can be deleted from
 Account settings (password required): that removes the account, its sessions, its applications and
 any org it's the only admin of. Set `CONTACT_EMAIL` to show a contact address on both pages.
+**Under-18 flag.** Applying shows an optional, self-reported "I am under 18" checkbox (a yes/no,
+never a birthdate). It's stored on that application only (`applications.under_18`) and returned only
+in the org's applicant list (`GET /api/vacancies/:id/applications`, admins), where it shows as an
+"Under 18" marker and a consent reminder on Accept. It's not on profiles, searchable or filterable,
+and the player's own application list doesn't return it either. Privacy Policy section "The
+under-18 flag on applications" describes it.
+
 These were written for this app, not by a lawyer, so have them reviewed before a public launch.
 
 Not verified yet: that the person linking a Riot ID owns it. Riot only offers that through Riot Sign
@@ -199,7 +206,7 @@ their profile.
 | `POST /api/organizations/:id/vacancies` | `{ title, role?, game? = TFT, region? = NA, level? = competitive }` |
 | `PATCH /api/vacancies/:id` | `{ status: open \| closed }` (title/role/game/region/level also editable) |
 | `GET /api/vacancies?game=&region=&role=&status=` | public listing, newest first; `status` defaults to `open`, or `closed` / `all` |
-| `POST /api/vacancies/:id/applications` | logged in with a linked Riot ID: applies as that player |
+| `POST /api/vacancies/:id/applications` | logged in with a linked Riot ID: applies as that player; `{ under18?: boolean }` |
 | `GET /api/vacancies/:id/applications` | org admins: pending first, each with `player` stats and `onRoster` |
 | `PATCH /api/applications/:id` | `{ status: accepted \| rejected, addToRoster? = true, role?, rosterStatus? }` |
 | `POST /api/applications/:id/roster` | add an accepted applicant: `{ role? = vacancy role or title, status? = active }` |

@@ -220,9 +220,10 @@ export function vacanciesRouter(deps: OrgDeps): Router {
 
   // A player applies as their own account's Riot ID; their verified profile is the resume,
   // read live, never copied into the application.
+  // `under18` is optional and self-reported; it's stored for the org only and not echoed back.
   router.post('/:id/applications', (req, res) => {
     const puuid = requireLinkedPlayer(req);
-    const application = orgs.createApplication(req.params.id, puuid);
+    const application = orgs.createApplication(req.params.id, puuid, flag(body(req), 'under18') ?? false);
     res.status(201).json({ ...application, player: summary(deps, puuid) });
   });
 

@@ -40,6 +40,7 @@ interface ApplicationRow {
   player_puuid: string;
   status: ApplicationStatus;
   applied_at: string;
+  under_18: number;
 }
 
 const toMembership = (r: MembershipRow): OrgMembership => ({
@@ -63,6 +64,7 @@ const toVacancy = (r: VacancyRow): Vacancy => ({
   postedAt: r.posted_at,
 });
 
+// Deliberately leaves out `under_18`: that flag is only for the reviewing org (listApplications).
 const toApplication = (r: ApplicationRow): Application => ({
   id: r.id,
   vacancyId: r.vacancy_id,
@@ -284,7 +286,8 @@ export class OrgRepo {
 
   // ---- Applications ----
 
-  createApplication(vacancyId: string, puuid: string): Application {
+  /** `under18`: the applicant's self-reported flag, shown only to this vacancy's org. */
+  createApplication(vacancyId: string, puuid: string, under18 = false): Application {
     const vacancy = this.requireVacancy(vacancyId);
     if (vacancy.status !== 'open') throw conflict('This vacancy is closed');
     this.requirePlayer(puuid);
@@ -298,10 +301,10 @@ export class OrgRepo {
     };
     const inserted = this.db
       .prepare(
-        `INSERT OR IGNORE INTO applications (id, vacancy_id, player_puuid, status, applied_at)
-         VALUES (@id, @vacancyId, @playerPuuid, @status, @appliedAt)`,
+        `INSERT OR IGNORE INTO applications (id, vacancy_id, player_puuid, status, applied_at, under_18)
+         VALUES (@id, @vacancyId, @playerPuuid, @status, @appliedAt, @under18)`,
       )
-      .run(app);
+      .run({ ...app, under18: under18 ? 1 : 0 });
     if (!inserted.changes) throw conflict('Player has already applied to this vacancy');
     return app;
   }
@@ -311,15 +314,15 @@ export class OrgRepo {
     return row ? toApplication(row) : null;
   }
 
-  /** Pending first, then newest. */
-  listApplications(vacancyId: string): Application[] {
+  /** The org's applicant view, pending first, then newest. The only place `under18` is read. */
+  listApplications(vacancyId: string): Array<Application & { under18: boolean }> {
     const rows = this.db
       .prepare(
         `SELECT * FROM applications WHERE vacancy_id = ?
          ORDER BY CASE status WHEN 'pending' THEN 0 ELSE 1 END, applied_at DESC, rowid DESC`,
       )
       .all(vacancyId) as ApplicationRow[];
-    return rows.map(toApplication);
+    return rows.map((r) => ({ ...toApplication(r), under18: r.under_18 === 1 }));
   }
 
   /** Whether the application's player is currently on the vacancy's org roster. */

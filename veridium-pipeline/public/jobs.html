@@ -110,6 +110,7 @@
             </div>
             <div class="apply-col"><span class="sub">Posted ${esc(fmtDate(v.postedAt))}</span>${applyControl(v)}</div>
           </div>
+          <div data-slot="${esc(v.id)}"></div>
           <div class="form-msg" data-msg="${esc(v.id)}"></div>
         </article>`).join('') : '<div class="card pad empty">No open vacancies match these filters.</div>';
       if (location.hash.startsWith('#v-')) document.getElementById(location.hash.slice(1))?.scrollIntoView({ block: 'center' });
@@ -121,15 +122,30 @@
   $('filters').addEventListener('change', loadList);
 
 
-  $('list').addEventListener('click', async (e) => {
+  // Apply opens a confirmation with the optional under-18 flag; Send posts the application.
+  $('list').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-apply]');
-    if (!b) return;
-    const id = b.dataset.apply;
+    if (b) {
+      const slot = document.querySelector(`[data-slot="${CSS.escape(b.dataset.apply)}"]`);
+      slot.innerHTML = slot.innerHTML ? '' : applyConfirmForm(b.dataset.apply);
+      slot.querySelector('button.primary')?.focus();
+      return;
+    }
+    const cancel = e.target.closest('[data-cancel]');
+    if (cancel) cancel.closest('[data-slot]').innerHTML = '';
+  });
+
+  $('list').addEventListener('submit', async (e) => {
+    const form = e.target.closest('form[data-confirm]');
+    if (!form) return;
+    e.preventDefault();
+    const id = form.dataset.confirm;
     const msg = document.querySelector(`[data-msg="${CSS.escape(id)}"]`);
-    b.disabled = true;
+    const send = form.querySelector('button.primary');
+    send.disabled = true;
     setMsg(msg, 'Sending your verified profile…');
     try {
-      await api(`/api/vacancies/${encodeURIComponent(id)}/applications`, { method: 'POST', body: {} });
+      await submitApplication(id, form.under18.checked);
       mine.set(id, 'pending');
       await loadList();
       const done = document.querySelector(`[data-msg="${CSS.escape(id)}"]`);
@@ -137,7 +153,7 @@
       done.className = 'form-msg ok';
     } catch (err) {
       setMsg(msg, err.message, 'error');
-      b.disabled = false;
+      send.disabled = false;
     }
   });
 

@@ -5,7 +5,8 @@ import { config } from './config';
  * public/terms.html and public/privacy.html) whenever either changes materially: every account
  * is then asked to accept again before it can do anything that needs a login.
  */
-export const TERMS_VERSION = '2026-10-10.2'; // .2: minimum age 16; orgs handle consent for players under 18
+// .2: minimum age 16; orgs handle consent for players under 18. .3: the under-18 application flag.
+export const TERMS_VERSION = '2026-10-10.3';
 
 export const legalInfo = () => ({
   termsVersion: TERMS_VERSION,

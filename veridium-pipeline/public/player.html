@@ -869,6 +869,20 @@
     }).join('');
   }
 
+  // Same apply step as the Jobs page (common.js, which this page doesn't load): an optional,
+  // self-reported "I am under 18" that only the organization sees.
+  const applyConfirmForm = (vacancyId) => `<form class="apply-confirm" data-confirm="${esc(vacancyId)}">
+    <label class="u18"><input type="checkbox" name="under18" />
+      <span><b>I am under 18</b> <span class="sub">(optional)</span><br>
+        <span class="sub">Only this organization sees this, so it knows a parent's or guardian's consent is needed before any offer.
+          <a href="privacy.html#under-18" target="_blank" rel="noopener">How it's used</a></span></span></label>
+    <div class="apply-confirm-actions"><button class="btn primary small">Send application</button>
+      <button class="btn small" type="button" data-cancel>Cancel</button></div>
+  </form>`;
+  const submitApplication = (vacancyId, under18) => fetch(`/api/vacancies/${encodeURIComponent(vacancyId)}/applications`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ under18 }),
+  }).then(jsonOrThrow);
+
   function renderOpenings(openings, apps, riotId, region) {
     const applied = new Map(apps.map((a) => [a.vacancyId, a.status]));
     const own = isOwnProfile();
@@ -884,21 +898,31 @@
             : own ? `<button class="btn small primary" data-apply="${esc(v.id)}">Apply</button>`
             : `<a class="btn small" href="jobs.html#v-${esc(v.id)}">View</a>`}
         </div>
+        <div data-slot></div>
       </div>`).join('');
-    $('openingList').onclick = async (e) => {
+    $('openingList').onclick = (e) => {
       const b = e.target.closest('button[data-apply]');
-      if (!b) return;
-      b.disabled = true;
+      if (b) {
+        const slot = b.closest('.item').querySelector('[data-slot]');
+        slot.innerHTML = slot.innerHTML ? '' : applyConfirmForm(b.dataset.apply);
+        slot.querySelector('button.primary')?.focus();
+        return;
+      }
+      const cancel = e.target.closest('[data-cancel]');
+      if (cancel) cancel.closest('[data-slot]').innerHTML = '';
+    };
+    $('openingList').onsubmit = async (e) => {
+      const form = e.target.closest('form[data-confirm]');
+      if (!form) return;
+      e.preventDefault();
+      const send = form.querySelector('button.primary');
+      send.disabled = true;
       try {
-        await fetch(`/api/vacancies/${encodeURIComponent(b.dataset.apply)}/applications`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: '{}', // applies as the logged-in account's Riot ID
-        }).then(jsonOrThrow);
+        await submitApplication(form.dataset.confirm, form.under18.checked); // applies as the logged-in account's Riot ID
         await loadOrgCards(riotId, region);
       } catch (err) {
         notice(err.message, 'error');
-        b.disabled = false;
+        send.disabled = false;
       }
     };
   }

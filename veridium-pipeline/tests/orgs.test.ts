@@ -70,8 +70,8 @@ async function postVacancy(fields: Record<string, string> = {}) {
   return res.body as { id: string };
 }
 
-async function apply(vacancyId: string, playerPuuid = PUUID) {
-  return as(playerCookie(playerPuuid)).post(`/api/vacancies/${vacancyId}/applications`).send({});
+async function apply(vacancyId: string, playerPuuid = PUUID, fields: Record<string, unknown> = {}) {
+  return as(playerCookie(playerPuuid)).post(`/api/vacancies/${vacancyId}/applications`).send(fields);
 }
 
 const roster = async () => (await api().get(`/api/organizations/${ORG}/roster`)).body as Array<Record<string, any>>;
@@ -91,6 +91,7 @@ describe('migrations', () => {
       { version: '006_accounts.sql' },
       { version: '007_remove_test_org.sql' },
       { version: '008_terms.sql' },
+      { version: '009_under_18_flag.sql' },
     ]);
     const tables = reopened.db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`).all();
     expect(tables.map((t: any) => t.name)).toEqual(
@@ -221,11 +222,39 @@ describe('applications: the player ↔ org loop', () => {
 
     // Stats aren't copied into the application row.
     const columns = store.db.prepare('PRAGMA table_info(applications)').all().map((c: any) => c.name);
-    expect(columns).toEqual(['id', 'vacancy_id', 'player_puuid', 'status', 'applied_at']);
+    expect(columns).toEqual(['id', 'vacancy_id', 'player_puuid', 'status', 'applied_at', 'under_18']);
 
     const list = (await api().get(`/api/vacancies/${v.id}/applications`)).body;
     expect(list).toEqual([expect.objectContaining({ id: res.body.id, player: expect.objectContaining({ riotId: 'WompCat#NA1' }) })]);
     expect((await api().get('/api/vacancies')).body[0]).toMatchObject({ applicationCount: 1, pendingCount: 1 });
+  });
+
+  it('shows the self-reported under-18 flag to the reviewing org only, and nowhere else', async () => {
+    const v = await postVacancy();
+    const minor = await apply(v.id, KAIRO, { under18: true });
+    expect(minor.status).toBe(201);
+    expect(minor.body).not.toHaveProperty('under18'); // not echoed back
+    await apply(v.id); // WompCat leaves it unchecked
+    expect((await apply((await postVacancy({ title: 'Sub' })).id, PUUID, { under18: 'yes' })).status).toBe(400);
+
+    // The org's applicant view: the one place it appears.
+    const applicants = (await api().get(`/api/vacancies/${v.id}/applications`)).body;
+    expect(applicants.map((a: any) => [a.player.riotId, a.under18])).toEqual([
+      ['WompCat#NA1', false],
+      ['Kairo#NA1', true],
+    ]);
+
+    // Accepting and rostering don't carry it, nor do the player's own list, the profile directory, the feed or rosters.
+    const decided = await api().patch(`/api/applications/${minor.body.id}`).send({ status: 'accepted' });
+    const elsewhere = [
+      decided.body,
+      (await as(playerCookie(KAIRO)).get('/api/players/na1/Kairo%23NA1/applications')).body,
+      (await api().get('/api/players')).body,
+      (await api().get('/api/feed')).body,
+      (await api().get(`/api/organizations/${ORG}/roster`)).body,
+      (await api().get('/api/vacancies')).body,
+    ];
+    for (const body of elsewhere) expect(JSON.stringify(body)).not.toMatch(/under.?18/i);
   });
 
   it('accepting adds the player to the roster', async () => {
