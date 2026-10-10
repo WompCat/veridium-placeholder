@@ -240,8 +240,28 @@
         <span class="game-icon sm">TFT</span>
         <div><b>Teamfight Tactics</b><div class="sub">${esc(rank)} · ${p.totalMatches ? `Top-4 ${pct(p.winRate)}` : 'no games this set'}</div></div>
       </a>
-      <div class="sub" style="margin-top:6px">League of Legends, Valorant and more are on the way.</div>`;
+      <div id="myLol"></div>
+      <div class="sub" style="margin-top:6px">Valorant and more are on the way.</div>`;
+    renderMyLol(p, href);
     renderQuickLinks(me);
+  }
+
+  // League of Legends in "My Games": cached data only, or a link to load it.
+  async function renderMyLol(p, href) {
+    const lolHref = `${href}&game=lol#games`;
+    let l = null;
+    try {
+      l = await api(`/api/players/${encodeURIComponent(p.region)}/${encodeURIComponent(p.riotId)}/lol?cached=1`);
+    } catch {}
+    $('myLol').innerHTML = l
+      ? `<a class="game-row" href="${esc(lolHref)}" style="color:inherit">
+          <span class="game-icon sm" style="background:linear-gradient(135deg,#c89b3c,#6b4a12)">LoL</span>
+          <div><b>League of Legends</b><div class="sub">${esc(l.ranks.solo ? fmtRank(l.ranks.solo) : 'Unranked')} · ${l.games ? `${pct(l.winRate)} WR` : 'no ranked games yet'}</div></div>
+        </a>`
+      : `<a class="game-row" href="${esc(lolHref)}" style="color:inherit">
+          <span class="game-icon sm muted">LoL</span>
+          <div><b>League of Legends</b><div class="sub" style="color:var(--accent)">+ Add your LoL stats</div></div>
+        </a>`;
   }
 
   // ---- Center: feed ----
@@ -350,7 +370,7 @@
         <a class="btn small" href="${esc(profileUrl(p))}">View</a>
       </div>`).join('') : '<div class="sub">No players loaded yet.</div>';
     const tracked = players.length;
-    $('games').innerHTML = [['TFT', 'TFT', `${tracked} player${tracked === 1 ? '' : 's'}`, true], ['LoL', 'LoL', 'Soon'], ['VAL', 'Valorant', 'Soon'], ['OW2', 'OW2', 'Soon'], ['CS2', 'CS2', 'Soon']]
+    $('games').innerHTML = [['TFT', 'TFT', `${tracked} player${tracked === 1 ? '' : 's'}`, true], ['LoL', 'LoL', 'Live', true], ['VAL', 'Valorant', 'Soon'], ['OW2', 'OW2', 'Soon'], ['CS2', 'CS2', 'Soon']]
       .map(([abbr, label, note, live]) => `<div><span class="game-icon ${live ? '' : 'muted'}">${abbr}</span><b>${label}</b>${note}</div>`).join('');
   }
 

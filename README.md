@@ -92,6 +92,29 @@ each tracked season, newest first, with its own stats and every match.
 - **Highest rank** is the highest snapshot Veridium has recorded, not the player's all-time peak.
 - **Percentile** is `null` because Riot doesn't provide one.
 
+## League of Legends
+
+`GET /api/players/:region/:riotId/lol` (with `?cached=1` for cache-only reads) loads a player's
+**ranked Solo/Duo and Flex** games for the current season. A LoL season is a calendar year, unlike
+TFT, where a season is a set. The flow matches TFT:
+
+- **First load:** returns the newest 20 games right away, then backfills the rest of the season in the
+  background. Later loads only fetch new games.
+- **Ranks:** come from `lol-league-v4` on every load.
+- **Stats:** games, win rate, average K/D/A, KDA, CS per minute, top champions and roles, plus every
+  match (champion, role, result, K/D/A, CS, length).
+
+Only ranked queues are tracked (`type=ranked`). That's what organizations recruit on, and it keeps
+the first load bounded on a dev key. Data lives in its own tables (`migrations/004_lol.sql`), and
+match rows are cached once and shared across players.
+
+On the Player Profile, the Games tab's game picker switches between TFT and LoL
+(`player.html?…&game=lol#games`). Overview shows a LoL card once a player has LoL data, and Home
+lists it under My Games.
+
+**Valorant** stays "Coming soon". Riot only opens Valorant match data to approved production keys,
+and players have to opt in through Riot Sign On.
+
 ## Pages
 
 All pages share one header (`public/shell.js`): search, plus Home / Players / Organizations /
@@ -150,6 +173,7 @@ their profile.
 | `POST /api/applications/:id/roster` | add an accepted applicant: `{ role? = vacancy role or title, status? = active }` |
 | `GET /api/players/:region/:riotId/applications` | a player's own applications with vacancy, org and status |
 | `GET /api/players` | every loaded player with verified stats, highest rank first |
+| `GET /api/players/:region/:riotId/lol` | League of Legends ranked profile for the current season (`?cached=1` for cache only) |
 | `GET /api/feed?limit=` | home feed: TFT sessions (one per player per day), roster joins, vacancies |
 
 Players must already be cached by the pipeline (their profile loaded once) before they can be

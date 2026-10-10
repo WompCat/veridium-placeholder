@@ -1,3 +1,4 @@
+import type { LolLeagueEntryDto, LolMatchDto } from '../lol/types';
 import type { RiotAccountDto, TftLeagueEntryDto, TftMatchDto } from '../types';
 import { hostFor, type RegionalRoute } from './regions';
 
@@ -121,5 +122,21 @@ export class RiotClient {
 
   getLeagueEntries(platform: string, puuid: string) {
     return this.get<TftLeagueEntryDto[]>(platform, `/tft/league/v1/by-puuid/${puuid}`);
+  }
+
+  // ---- League of Legends ----
+
+  /** Ranked match ids (Solo/Duo + Flex), most recent first. Riot allows `count` up to 100. */
+  getLolMatchIds(regional: RegionalRoute, puuid: string, opts: { start: number; count: number }) {
+    const params = new URLSearchParams({ type: 'ranked', start: String(opts.start), count: String(opts.count) });
+    return this.get<string[]>(regional, `/lol/match/v5/matches/by-puuid/${puuid}/ids?${params}`);
+  }
+
+  getLolMatch(regional: RegionalRoute, matchId: string) {
+    return this.get<LolMatchDto>(regional, `/lol/match/v5/matches/${matchId}`);
+  }
+
+  getLolLeagueEntries(platform: string, puuid: string) {
+    return this.get<LolLeagueEntryDto[]>(platform, `/lol/league/v4/entries/by-puuid/${puuid}`);
   }
 }
