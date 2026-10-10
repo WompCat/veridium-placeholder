@@ -1,3 +1,4 @@
+import type { Priority } from '../riot/client';
 import { regionalFor, type RegionalRoute } from '../riot/regions';
 import { parseRiotId, type IngestDeps } from '../tft/ingest';
 import { buildLolProfile } from './aggregate';
@@ -23,10 +24,15 @@ export interface LolIngestResult {
 const lol = (deps: IngestDeps) => new LolStore(deps.store.db);
 const currentSeason = (deps: IngestDeps) => seasonOf((deps.now ?? Date.now)());
 
-async function fetchUncached(deps: IngestDeps, regional: RegionalRoute, ids: string[]): Promise<string[]> {
+async function fetchUncached(
+  deps: IngestDeps,
+  regional: RegionalRoute,
+  ids: string[],
+  priority: Priority = 'foreground',
+): Promise<string[]> {
   const store = lol(deps);
   const missing = ids.filter((id) => !store.hasMatch(id));
-  const fetched = await Promise.all(missing.map((id) => deps.client.getLolMatch(regional, id)));
+  const fetched = await Promise.all(missing.map((id) => deps.client.getLolMatch(regional, id, priority)));
   for (const raw of fetched) store.saveMatch(raw);
   return missing;
 }
@@ -58,10 +64,10 @@ export function backfillLol(deps: IngestDeps, regional: RegionalRoute, puuid: st
     const season = currentSeason(deps);
     let oldStreak = 0;
     for (let start = 0; ; start += HISTORY_PAGE) {
-      const ids = await deps.client.getLolMatchIds(regional, puuid, { start, count: HISTORY_PAGE });
+      const ids = await deps.client.getLolMatchIds(regional, puuid, { start, count: HISTORY_PAGE, priority: 'background' });
       for (let i = 0; i < ids.length && oldStreak < OLD_STREAK_TO_STOP; i += DETAIL_CHUNK) {
         const chunk = ids.slice(i, i + DETAIL_CHUNK);
-        await fetchUncached(deps, regional, chunk);
+        await fetchUncached(deps, regional, chunk, 'background');
         for (const id of chunk) {
           const s = store.matchSeason(id);
           oldStreak = s !== null && s < season ? oldStreak + 1 : 0;
