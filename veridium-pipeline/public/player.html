@@ -36,6 +36,22 @@
   .mini-table th, .mini-table td { padding: 8px 6px; }
   .cta { background: var(--banner); color: #fff; border: 0; }
   .cta .sub { color: rgba(255,255,255,.8); }
+  .game-pick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+  .game-pick button { display: flex; align-items: center; gap: 12px; border: 1px solid var(--border); background: var(--card); border-radius: 12px; padding: 12px 14px; font: inherit; text-align: left; cursor: pointer; color: var(--text); }
+  .game-pick button:hover:not(:disabled) { border-color: #c7cbff; }
+  .game-pick button.on { border: 2px solid var(--accent); padding: 11px 13px; background: var(--accent-soft); }
+  .game-pick button:disabled { cursor: default; background: var(--bg); }
+  .game-pick .game-icon { width: 40px; height: 40px; font-size: 12px; flex: none; }
+  .game-pick button:disabled .game-icon { background: #e1e4ef; color: var(--muted); }
+  .lol-ranks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+  .lol-rank { display: flex; align-items: center; gap: 12px; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+  .lol-rank b { display: block; font-size: 16px; }
+  .wl { display: inline-grid; place-items: center; min-width: 44px; padding: 2px 8px; border-radius: 999px; font-weight: 700; font-size: 12px; }
+  .wl.win { background: #e7f7ee; color: var(--good); }
+  .wl.loss { background: #fdecef; color: var(--bad); }
+  .champ { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg, #c89b3c, #6b4a12); color: #fff; font-weight: 800; font-size: 11px; margin-right: 8px; vertical-align: middle; }
+  .two-col { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 20px; }
+  @media (max-width: 760px) { .game-pick { grid-template-columns: minmax(0, 1fr); } .lol-ranks, .two-col { grid-template-columns: minmax(0, 1fr); } }
   @media (max-width: 640px) { .kv div { grid-template-columns: 1fr; gap: 2px; } }
 </style>
 </head>
@@ -83,6 +99,12 @@
       </div>
       <div class="stats" id="ovStats"></div>
     </section>
+    <section class="card pad" data-view="overview" id="ovLol" hidden>
+      <div class="table-head"><div class="game-head" style="margin:0"><div class="game-icon" style="background:linear-gradient(135deg,#c89b3c,#6b4a12)">LoL</div>
+        <div><h2>League of Legends</h2><div class="sub" id="ovLolNote">Ranked this season</div></div></div>
+        <a href="#games" data-open-lol class="sub">View LoL stats →</a></div>
+      <div class="stats" id="ovLolStats" style="margin-top:12px"></div>
+    </section>
     <section class="card pad" data-view="overview" hidden>
       <div class="table-head"><h2>Recent Matches</h2><a href="#matches" class="sub">View all matches →</a></div>
       <div class="table-wrap"><table>
@@ -93,6 +115,15 @@
 
     <!-- Games -->
     <section class="card pad" data-view="games" hidden>
+      <h2>All Games</h2>
+      <div class="sub">Verified performance across titles</div>
+      <div class="game-pick" id="gamePick" role="tablist" aria-label="Game">
+        <button role="tab" data-game="tft"><span class="game-icon">TFT</span><span><b>Teamfight Tactics</b><span class="sub" style="display:block" id="pickTft">TFT</span></span></button>
+        <button role="tab" data-game="lol"><span class="game-icon" style="background:linear-gradient(135deg,#c89b3c,#6b4a12)">LoL</span><span><b>League of Legends</b><span class="sub" style="display:block" id="pickLol">Ranked Solo/Duo + Flex</span></span></button>
+        <button role="tab" disabled title="Valorant is coming soon"><span class="game-icon">VAL</span><span><b>Valorant</b><span class="sub" style="display:block">Coming soon</span></span></button>
+      </div>
+    </section>
+    <section class="card pad" data-view="games" data-game="tft" hidden>
       <div class="game-head">
         <div class="game-icon">TFT</div>
         <div style="flex:1">
@@ -109,7 +140,7 @@
       </div>
     </section>
 
-    <section class="card pad" data-view="games" hidden>
+    <section class="card pad" data-view="games" data-game="tft" hidden>
       <div class="table-head">
         <h2 id="matchesTitle">Matches</h2>
         <div class="seg" id="queueFilter">
@@ -125,6 +156,35 @@
         </table>
       </div>
       <button class="expand" id="expand" aria-expanded="false" aria-controls="matches" hidden></button>
+    </section>
+
+    <!-- League of Legends -->
+    <section class="card pad" data-view="games" data-game="lol" hidden>
+      <div class="game-head">
+        <div class="game-icon" style="background:linear-gradient(135deg,#c89b3c,#6b4a12)">LoL</div>
+        <div style="flex:1"><h2>League of Legends</h2><div class="sub" id="lolNote">Ranked Solo/Duo and Flex</div></div>
+      </div>
+      <div id="lolBody"><div class="empty">Loading League of Legends from Riot…</div></div>
+    </section>
+    <section class="card pad" data-view="games" data-game="lol" hidden>
+      <div class="two-col">
+        <div><h2>Top Champions</h2><div class="sub">This season, most played first</div>
+          <div class="table-wrap" style="margin-top:8px"><table>
+            <thead><tr><th>Champion</th><th>Games</th><th>Win Rate</th><th>KDA</th></tr></thead>
+            <tbody id="lolChamps"></tbody></table></div></div>
+        <div><h2>Roles</h2><div class="sub">Where they play</div>
+          <div class="table-wrap" style="margin-top:8px"><table>
+            <thead><tr><th>Role</th><th>Games</th><th>Win Rate</th></tr></thead>
+            <tbody id="lolRoles"></tbody></table></div></div>
+      </div>
+    </section>
+    <section class="card pad" data-view="games" data-game="lol" hidden>
+      <div class="table-head"><h2>Ranked Matches</h2><span class="sub" id="lolCount"></span></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Date</th><th>Queue</th><th>Champion</th><th>Role</th><th>Result</th><th>K / D / A</th><th>CS</th><th>Length</th></tr></thead>
+        <tbody id="lolMatches"></tbody>
+      </table></div>
+      <button class="expand" id="lolMore" hidden></button>
     </section>
 
     <!-- Matches: every tracked match -->
@@ -270,7 +330,11 @@
   const fmtDate = (d) => new Date(d + 'T12:00:00Z').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-  const view = { profile: null, set: null, queue: 'RANKED_TFT', expanded: false, allShown: ALL_PAGE };
+  const view = {
+    profile: null, set: null, queue: 'RANKED_TFT', expanded: false, allShown: ALL_PAGE,
+    game: new URLSearchParams(location.search).get('game') === 'lol' ? 'lol' : 'tft',
+    lol: null, lolState: 'idle', lolShown: 10,
+  };
   let pollTimer = null;
 
   // ---- Tabs: the hash (#matches) picks the view, so tabs are linkable and work with back/forward ----
@@ -284,7 +348,14 @@
       b.classList.toggle('on', b.dataset.tab === tab);
       b.setAttribute('aria-selected', String(b.dataset.tab === tab));
     }
-    for (const v of document.querySelectorAll('[data-view]')) v.hidden = v.dataset.view !== tab;
+    for (const v of document.querySelectorAll('[data-view]')) {
+      v.hidden = v.dataset.view !== tab || (v.dataset.game && v.dataset.game !== view.game) || (v.id === 'ovLol' && !view.lol);
+    }
+    for (const b of document.querySelectorAll('#gamePick button[data-game]')) {
+      b.classList.toggle('on', b.dataset.game === view.game);
+      b.setAttribute('aria-selected', String(b.dataset.game === view.game));
+    }
+    if (tab === 'games' && view.game === 'lol') ensureLol();
   }
   $('tabs').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-tab]');
@@ -300,6 +371,126 @@
   const allMatches = () => (view.profile.seasons || []).flatMap((s) => s.matches); // newest first
   const seasonOptions = (withAll) => (withAll ? '<option value="">All seasons</option>' : '') +
     (view.profile.seasons || []).map((s) => `<option value="${s.set}">${esc(s.label)}${s.current ? ' (current)' : ''}</option>`).join('');
+
+  // ---- League of Legends ----
+  const ROLE_NAMES = { TOP: 'Top', JUNGLE: 'Jungle', MIDDLE: 'Mid', BOTTOM: 'Bot', UTILITY: 'Support' };
+  const QUEUE_NAMES = { RANKED_SOLO_5x5: 'Solo/Duo', RANKED_FLEX_SR: 'Flex' };
+  const LOL_EMBLEM = '<svg width="34" height="34" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2l12 6v9c0 7-5.5 11.5-12 13C9.5 28.5 4 24 4 17V8z" fill="#c89b3c"/><path d="M10 12l6 9 6-9" stroke="#fff" stroke-width="2.4" fill="none"/></svg>';
+  const lolPath = () => `/api/players/${encodeURIComponent(view.profile.region)}/${encodeURIComponent(view.profile.riotId)}/lol`;
+  const lolRankText = (r) => r ? `${fmtRank(`${r.tier} ${r.division}`)} · ${r.leaguePoints} LP` : 'Unranked';
+  let lolPoll = null;
+
+  // Cached LoL data only (no Riot calls): fills the Overview card and picker when the player has been loaded for LoL.
+  async function loadLolCached() {
+    try {
+      const r = await fetch(`${lolPath()}?cached=1`);
+      if (r.ok) view.lol = await r.json();
+    } catch {}
+    renderLol();
+    showTab();
+  }
+
+  // Opening the LoL view refreshes from Riot once per page load, falling back to cached data.
+  async function ensureLol() {
+    if (!view.profile || view.lolState !== 'idle') return;
+    view.lolState = 'loading';
+    renderLol();
+    try {
+      const res = await fetch(lolPath());
+      const body = await res.json().catch(() => ({}));
+      if (res.ok) {
+        view.lol = body;
+      } else {
+        const cached = res.status >= 500 ? await fetch(`${lolPath()}?cached=1`).catch(() => null) : null;
+        if (!cached?.ok) throw new Error(body.error || `HTTP ${res.status}`);
+        view.lol = await cached.json();
+        notice(`Showing cached League stats. Couldn't refresh from Riot: ${body.error || `HTTP ${res.status}`}`, 'info');
+      }
+      view.lolState = 'loaded';
+      if (view.lol.history.syncing) pollLol();
+    } catch (err) {
+      view.lolState = 'error';
+      view.lolError = err.message;
+    }
+    renderLol();
+    showTab();
+  }
+
+  function pollLol() {
+    clearTimeout(lolPoll);
+    lolPoll = setTimeout(async () => {
+      try {
+        const r = await fetch(`${lolPath()}?cached=1`);
+        if (!r.ok) return;
+        view.lol = await r.json();
+        renderLol();
+        if (view.lol.history.syncing) pollLol();
+      } catch {
+        pollLol();
+      }
+    }, 4000);
+  }
+
+  function renderLol() {
+    const l = view.lol;
+    $('pickLol').textContent = l?.ranks.solo ? `Solo/Duo ${fmtRank(`${l.ranks.solo.tier} ${l.ranks.solo.division}`)}` : 'Ranked Solo/Duo + Flex';
+    if (!l) {
+      $('lolBody').innerHTML = view.lolState === 'error'
+        ? `<div class="empty">Couldn't load League of Legends: ${esc(view.lolError)}</div>`
+        : '<div class="empty">Loading League of Legends from Riot…</div>';
+      $('lolChamps').innerHTML = $('lolRoles').innerHTML = $('lolMatches').innerHTML = '';
+      $('lolMore').hidden = true;
+      return;
+    }
+    const tile = (label, value, hint) => `<div class="stat"><div class="label">${label}</div><div class="value" style="font-size:22px">${value}</div><div class="hint">${hint}</div></div>`;
+    const rankCard = (label, r) => `<div class="lol-rank">${LOL_EMBLEM}<div><span class="sub">${label}</span><b>${esc(r ? fmtRank(`${r.tier} ${r.division}`) : 'Unranked')}</b>
+      <span class="sub">${r ? `${r.leaguePoints} LP · ${r.wins}W ${r.losses}L · ${pct(r.wins / Math.max(1, r.wins + r.losses))}` : 'No placement this season'}</span></div></div>`;
+    $('lolNote').textContent = `Season ${l.season} · Ranked Solo/Duo and Flex` + (l.history.syncing ? ` · loading season history, ${l.games} games so far…` : '');
+    $('lolBody').innerHTML = `
+      <div class="lol-ranks">${rankCard('Ranked Solo/Duo', l.ranks.solo)}${rankCard('Ranked Flex', l.ranks.flex)}</div>
+      <div class="stats">
+        ${tile('Ranked Games', l.games, 'verified this season')}
+        ${tile('Win Rate', l.games ? pct(l.winRate) : '–', l.games ? `${l.wins}W / ${l.games - l.wins}L` : '')}
+        ${tile('KDA', l.games ? l.kda.toFixed(2) : '–', l.games ? `${l.kills} / ${l.deaths} / ${l.assists}` : '')}
+        ${tile('CS / min', l.games ? l.csPerMin.toFixed(1) : '–', 'creeps + monsters')}
+      </div>`;
+    const initials2 = (c) => esc(c.slice(0, 2));
+    $('lolChamps').innerHTML = l.champions.length ? l.champions.slice(0, 8).map((c) => `<tr><td><span class="champ">${initials2(c.champion)}</span>${esc(c.champion)}</td>
+      <td>${c.games}</td><td>${pct(c.winRate)}</td><td>${c.kda.toFixed(2)}</td></tr>`).join('') : '<tr><td colspan="4" class="empty">No ranked games this season.</td></tr>';
+    $('lolRoles').innerHTML = l.roles.length ? l.roles.map((r) => `<tr><td>${esc(ROLE_NAMES[r.role] ?? r.role)}</td><td>${r.games}</td><td>${pct(r.winRate)}</td></tr>`).join('')
+      : '<tr><td colspan="3" class="empty">—</td></tr>';
+    const rows = l.matches.slice(0, view.lolShown);
+    $('lolCount').textContent = `${l.matches.length} game${l.matches.length === 1 ? '' : 's'} this season`;
+    $('lolMatches').innerHTML = rows.length ? rows.map((m) => `<tr><td>${fmtDate(m.date)}</td><td>${QUEUE_NAMES[m.queue]}</td>
+      <td><span class="champ">${initials2(m.champion)}</span>${esc(m.champion)}</td><td>${esc(ROLE_NAMES[m.role] ?? '—')}</td>
+      <td><span class="wl ${m.win ? 'win' : 'loss'}">${m.win ? 'Win' : 'Loss'}</span></td>
+      <td>${m.kills} / ${m.deaths} / ${m.assists}</td><td>${m.cs}</td><td>${Math.round(m.durationMin)}m</td></tr>`).join('')
+      : '<tr><td colspan="8" class="empty">No ranked games this season yet.</td></tr>';
+    $('lolMore').hidden = l.matches.length <= view.lolShown;
+    $('lolMore').innerHTML = `Show ${Math.min(20, l.matches.length - view.lolShown)} more <span class="chev">▾</span>`;
+
+    $('ovLolNote').textContent = `Ranked this season (${l.season})`;
+    $('ovLolStats').innerHTML = [
+      tile('Solo/Duo', esc(l.ranks.solo ? fmtRank(`${l.ranks.solo.tier} ${l.ranks.solo.division}`) : 'Unranked'), l.ranks.solo ? `${l.ranks.solo.leaguePoints} LP` : 'Ranked Solo/Duo'),
+      tile('Win Rate', l.games ? pct(l.winRate) : '–', `${l.games} games`),
+      tile('KDA', l.games ? l.kda.toFixed(2) : '–', l.games ? `${l.kills} / ${l.deaths} / ${l.assists}` : ''),
+      tile('Top Champion', esc(l.champions[0]?.champion ?? '–'), l.champions[0] ? `${l.champions[0].games} games` : ''),
+    ].join('');
+  }
+
+  function selectGame(game) {
+    view.game = game;
+    const url = new URL(location.href);
+    if (game === 'lol') url.searchParams.set('game', 'lol'); else url.searchParams.delete('game');
+    history.replaceState(null, '', url);
+    showTab();
+  }
+  $('gamePick').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-game]');
+    if (b) selectGame(b.dataset.game);
+  });
+  document.querySelector('[data-open-lol]').addEventListener('click', () => selectGame('lol'));
+  $('lolMore').addEventListener('click', () => { view.lolShown += 20; renderLol(); });
 
   // ---- Overview ----
   function renderOverview() {
@@ -364,10 +555,10 @@
     const rows = [
       ['Riot ID', esc(p.riotId)],
       ['Region', esc(p.region.toUpperCase())],
-      ['Primary game', 'Teamfight Tactics'],
+      ['Games', `Teamfight Tactics${view.lol ? `, League of Legends (${view.lol.games} ranked games this season)` : ''}`],
       ['Current rank', esc(p.rank ? `${fmtRank(`${p.rank.tier} ${p.rank.division}`)} · ${p.rank.leaguePoints} LP` : 'Unranked')],
       ['Match history', `${total} matches across ${seasons.map((s) => esc(s.label)).join(', ') || 'no seasons yet'}${p.history?.complete ? '' : ' (still loading)'}`],
-      ['Data sources', 'Riot Games API: account-v1, tft-match-v1, tft-league-v1'],
+      ['Data sources', 'Riot Games API: account-v1, tft-match-v1, tft-league-v1, and for League of Legends lol-match-v5, lol-league-v4'],
       ['Applications', '<a href="#applications">See this player\'s applications</a>'],
     ];
     $('aboutRows').innerHTML = rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
@@ -503,6 +694,7 @@
     renderAbout();
     renderMiniSeasons();
     renderMeButton();
+    $('pickTft').textContent = p.rank ? fmtRank(`${p.rank.tier} ${p.rank.division}`) : 'Unranked';
   }
 
   // ---- Vacancies & applications (no accounts yet: applications are made as the profile shown) ----
@@ -633,6 +825,7 @@
         view.set = cachedBody.currentSet;
         view.expanded = false;
         render(cachedBody);
+        loadLolCached();
         notice(`Showing cached stats. Couldn't refresh from Riot: ${body.error || `HTTP ${res.status}`}`, 'info');
         loadOrgCards(cachedBody.riotId, cachedBody.region);
         return;
@@ -641,6 +834,7 @@
       view.expanded = false;
       render(body);
       historyNotice(body);
+      loadLolCached();
       loadOrgCards(body.riotId, body.region);
       if (body.history.syncing) pollHistory(riotId, region);
     } catch (err) {
