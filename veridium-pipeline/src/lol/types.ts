@@ -10,6 +10,7 @@ export interface LolParticipantDto {
   assists: number;
   totalMinionsKilled: number;
   neutralMinionsKilled: number;
+  gameEndedInEarlySurrender?: boolean; // remake
 }
 
 export interface LolMatchDto {
@@ -33,7 +34,8 @@ export interface LolLeagueEntryDto {
 
 // ---- Profile response ----
 
-export type LolQueue = 'RANKED_SOLO_5x5' | 'RANKED_FLEX_SR';
+/** Riot's league queue type, e.g. RANKED_SOLO_5x5, RANKED_FLEX_SR, RANKED_PREMADE_5x5. */
+export type LolQueue = string;
 
 export interface LolRank {
   tier: string;
@@ -46,7 +48,8 @@ export interface LolRank {
 export interface LolMatchRow {
   matchId: string;
   date: string; // YYYY-MM-DD
-  queue: LolQueue;
+  queueId: number; // 420 Solo/Duo, 440 Flex; others shown as plain "Ranked"
+  remake: boolean; // listed, but excluded from every stat
   champion: string;
   role: string;
   win: boolean;
@@ -71,7 +74,9 @@ export interface LolProfile {
   region: string;
   season: number; // calendar year
   ranks: { solo: LolRank | null; flex: LolRank | null };
-  games: number; // ranked games this season that Veridium has verified
+  otherRanks: Array<LolRank & { queue: LolQueue }>; // any other ranked queue Riot reports (e.g. RANKED_PREMADE_5x5)
+  games: number; // ranked games this season that Veridium has verified, remakes excluded
+  remakes: number;
   wins: number;
   winRate: number;
   kills: number; // averages per game

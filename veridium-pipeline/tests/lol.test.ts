@@ -56,8 +56,40 @@ describe('ingestLol', () => {
       { role: 'MIDDLE', games: 2, winRate: 0.5 },
       { role: 'UTILITY', games: 1, winRate: 1 },
     ]);
-    expect(p.matches[0]).toMatchObject({ champion: 'Ahri', win: true, kills: 10, queue: 'RANKED_SOLO_5x5', cs: 180, date: '2026-01-31' });
-    expect(p.matches[2].queue).toBe('RANKED_FLEX_SR');
+    expect(p.matches[0]).toMatchObject({ champion: 'Ahri', win: true, kills: 10, queueId: 420, cs: 180, date: '2026-01-31', remake: false });
+    expect(p.matches[2].queueId).toBe(440);
+    expect(p).toMatchObject({ remakes: 0, otherRanks: [] });
+  });
+
+  it('lists remakes but leaves them out of every stat', async () => {
+    const remake = lolMatch(31, { win: false, k: 0, d: 0, a: 0, cs: 15 });
+    remake.info.gameDuration = 133;
+    remake.info.participants.forEach((p) => (p.gameEndedInEarlySurrender = true));
+    const { deps } = setup({ matches: [remake, lolMatch(30, { win: true, k: 6, d: 2, a: 4 })], league: [] });
+
+    const { history } = await ingestLol(deps, 'na1', 'WompCat#NA1');
+    await history;
+    const p = (await ingestLol(deps, 'na1', 'WompCat#NA1')).profile;
+
+    expect(p).toMatchObject({ games: 1, wins: 1, winRate: 1, remakes: 1, kda: 5 });
+    expect(p.matches.map((m) => [m.matchId, m.remake])).toEqual([
+      ['NA1_2026031', true],
+      ['NA1_2026030', false],
+    ]);
+  });
+
+  it('keeps ranks for other ranked queues, like 5v5 Premade', async () => {
+    const { deps } = setup({
+      matches: [],
+      league: [
+        soloEntry('CHALLENGER', 'I', 2013, 390, 335),
+        { queueType: 'RANKED_PREMADE_5x5', tier: 'DIAMOND', rank: 'II', leaguePoints: 76, wins: 5, losses: 0 },
+        { queueType: 'CHERRY', tier: '', rank: '', leaguePoints: 0, wins: 9, losses: 1 },
+      ],
+    });
+    const p = (await ingestLol(deps, 'na1', 'WompCat#NA1')).profile;
+    expect(p.ranks).toEqual({ solo: { tier: 'CHALLENGER', division: 'I', leaguePoints: 2013, wins: 390, losses: 335 }, flex: null });
+    expect(p.otherRanks).toEqual([{ queue: 'RANKED_PREMADE_5x5', tier: 'DIAMOND', division: 'II', leaguePoints: 76, wins: 5, losses: 0 }]);
   });
 
   it('backfills only the current season', async () => {

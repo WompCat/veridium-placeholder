@@ -60,6 +60,7 @@ describe('migrations', () => {
       { version: '002_organizations.sql' },
       { version: '003_vacancy_roles.sql' },
       { version: '004_lol.sql' },
+      { version: '005_lol_remakes.sql' },
     ]);
     const tables = reopened.db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`).all();
     expect(tables.map((t: any) => t.name)).toEqual(
