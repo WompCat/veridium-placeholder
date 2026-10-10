@@ -10,6 +10,7 @@ export interface LolParticipantRow {
   queueId: number;
   season: number;
   duration: number;
+  remake: boolean;
   champion: string;
   role: string;
   win: boolean;
@@ -37,7 +38,8 @@ export class LolStore {
   saveMatch(raw: LolMatchDto): void {
     const { info, metadata } = raw;
     const insertMatch = this.db.prepare(
-      `INSERT OR IGNORE INTO lol_matches (match_id, game_end, queue_id, season, duration, raw_json) VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT OR IGNORE INTO lol_matches (match_id, game_end, queue_id, season, duration, remake, raw_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
     );
     const insertParticipant = this.db.prepare(
       `INSERT OR IGNORE INTO lol_participants (puuid, match_id, champion, role, win, kills, deaths, assists, cs)
@@ -50,6 +52,7 @@ export class LolStore {
         info.queueId,
         seasonOf(info.gameEndTimestamp),
         info.gameDuration,
+        info.participants.some((p) => p.gameEndedInEarlySurrender) ? 1 : 0,
         JSON.stringify(raw),
       );
       for (const p of info.participants) {
@@ -88,7 +91,7 @@ export class LolStore {
   getParticipations(puuid: string, season: number): LolParticipantRow[] {
     const rows = this.db
       .prepare(
-        `SELECT p.match_id, m.game_end, m.queue_id, m.season, m.duration, p.champion, p.role, p.win,
+        `SELECT p.match_id, m.game_end, m.queue_id, m.season, m.duration, m.remake, p.champion, p.role, p.win,
                 p.kills, p.deaths, p.assists, p.cs
          FROM lol_participants p JOIN lol_matches m ON m.match_id = p.match_id
          WHERE p.puuid = ? AND m.season = ?
@@ -101,6 +104,7 @@ export class LolStore {
       queueId: r.queue_id as number,
       season: r.season as number,
       duration: r.duration as number,
+      remake: r.remake === 1,
       champion: r.champion as string,
       role: r.role as string,
       win: r.win === 1,
@@ -117,7 +121,7 @@ export class LolStore {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     for (const e of entries) {
-      if (e.queueType !== 'RANKED_SOLO_5x5' && e.queueType !== 'RANKED_FLEX_SR') continue;
+      if (!e.queueType.startsWith('RANKED_') || !e.tier) continue;
       insert.run(puuid, e.queueType, e.tier, e.rank, e.leaguePoints, e.wins, e.losses, fetchedAt);
     }
   }
@@ -134,6 +138,17 @@ export class LolStore {
     return row
       ? { tier: row.tier, division: row.division, leaguePoints: row.league_points, wins: row.wins, losses: row.losses }
       : null;
+  }
+
+  /** Latest rank for every ranked queue the player has a snapshot for. */
+  latestRanks(puuid: string): Array<LolRank & { queue: string }> {
+    const queues = this.db.prepare('SELECT DISTINCT queue FROM lol_rank_snapshots WHERE puuid = ? ORDER BY queue').all(puuid) as Array<{
+      queue: string;
+    }>;
+    return queues.flatMap(({ queue }) => {
+      const r = this.latestRank(puuid, queue);
+      return r ? [{ queue, ...r }] : [];
+    });
   }
 
   syncPoint(puuid: string): number | null {

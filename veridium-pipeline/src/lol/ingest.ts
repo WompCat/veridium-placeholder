@@ -85,7 +85,7 @@ export function loadLolProfile(deps: IngestDeps, puuid: string, riotId: string, 
     region,
     season,
     rows: store.getParticipations(puuid, season),
-    ranks: { solo: store.latestRank(puuid, 'RANKED_SOLO_5x5'), flex: store.latestRank(puuid, 'RANKED_FLEX_SR') },
+    ranks: store.latestRanks(puuid),
     history: { complete: store.historyComplete(puuid, season), syncing: backfills.has(puuid) },
   });
 }

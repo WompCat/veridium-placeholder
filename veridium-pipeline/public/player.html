@@ -49,6 +49,7 @@
   .wl { display: inline-grid; place-items: center; min-width: 44px; padding: 2px 8px; border-radius: 999px; font-weight: 700; font-size: 12px; }
   .wl.win { background: #e7f7ee; color: var(--good); }
   .wl.loss { background: #fdecef; color: var(--bad); }
+  .wl.remake { background: #eef0f6; color: var(--muted); }
   .champ { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg, #c89b3c, #6b4a12); color: #fff; font-weight: 800; font-size: 11px; margin-right: 8px; vertical-align: middle; }
   .two-col { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 20px; }
   @media (max-width: 760px) { .game-pick { grid-template-columns: minmax(0, 1fr); } .lol-ranks, .two-col { grid-template-columns: minmax(0, 1fr); } }
@@ -373,8 +374,10 @@
     (view.profile.seasons || []).map((s) => `<option value="${s.set}">${esc(s.label)}${s.current ? ' (current)' : ''}</option>`).join('');
 
   // ---- League of Legends ----
+  const titleCase = (t) => t.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
   const ROLE_NAMES = { TOP: 'Top', JUNGLE: 'Jungle', MIDDLE: 'Mid', BOTTOM: 'Bot', UTILITY: 'Support' };
-  const QUEUE_NAMES = { RANKED_SOLO_5x5: 'Solo/Duo', RANKED_FLEX_SR: 'Flex' };
+  const QUEUE_NAMES = { 420: 'Solo/Duo', 440: 'Flex' }; // by match queueId; other ranked queues say "Ranked"
+  const LEAGUE_NAMES = { RANKED_PREMADE_5x5: 'Ranked 5v5 Premade' }; // other league queues Riot reports
   const LOL_EMBLEM = '<svg width="34" height="34" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2l12 6v9c0 7-5.5 11.5-12 13C9.5 28.5 4 24 4 17V8z" fill="#c89b3c"/><path d="M10 12l6 9 6-9" stroke="#fff" stroke-width="2.4" fill="none"/></svg>';
   const lolPath = () => `/api/players/${encodeURIComponent(view.profile.region)}/${encodeURIComponent(view.profile.riotId)}/lol`;
   const lolRankText = (r) => r ? `${fmtRank(`${r.tier} ${r.division}`)} · ${r.leaguePoints} LP` : 'Unranked';
@@ -447,7 +450,8 @@
       <span class="sub">${r ? `${r.leaguePoints} LP · ${r.wins}W ${r.losses}L · ${pct(r.wins / Math.max(1, r.wins + r.losses))}` : 'No placement this season'}</span></div></div>`;
     $('lolNote').textContent = `Season ${l.season} · Ranked Solo/Duo and Flex` + (l.history.syncing ? ` · loading season history, ${l.games} games so far…` : '');
     $('lolBody').innerHTML = `
-      <div class="lol-ranks">${rankCard('Ranked Solo/Duo', l.ranks.solo)}${rankCard('Ranked Flex', l.ranks.flex)}</div>
+      <div class="lol-ranks">${rankCard('Ranked Solo/Duo', l.ranks.solo)}${rankCard('Ranked Flex', l.ranks.flex)}${(l.otherRanks || [])
+        .map((r) => rankCard(LEAGUE_NAMES[r.queue] ?? titleCase(r.queue.replace(/^RANKED_/, '').replace(/_/g, ' ')), r)).join('')}</div>
       <div class="stats">
         ${tile('Ranked Games', l.games, 'verified this season')}
         ${tile('Win Rate', l.games ? pct(l.winRate) : '–', l.games ? `${l.wins}W / ${l.games - l.wins}L` : '')}
@@ -460,10 +464,11 @@
     $('lolRoles').innerHTML = l.roles.length ? l.roles.map((r) => `<tr><td>${esc(ROLE_NAMES[r.role] ?? r.role)}</td><td>${r.games}</td><td>${pct(r.winRate)}</td></tr>`).join('')
       : '<tr><td colspan="3" class="empty">—</td></tr>';
     const rows = l.matches.slice(0, view.lolShown);
-    $('lolCount').textContent = `${l.matches.length} game${l.matches.length === 1 ? '' : 's'} this season`;
-    $('lolMatches').innerHTML = rows.length ? rows.map((m) => `<tr><td>${fmtDate(m.date)}</td><td>${QUEUE_NAMES[m.queue]}</td>
+    $('lolCount').textContent = `${l.games} game${l.games === 1 ? '' : 's'} this season${l.remakes ? ` (+${l.remakes} remake${l.remakes === 1 ? '' : 's'}, not counted)` : ''}`;
+    $('lolMatches').innerHTML = rows.length ? rows.map((m) => `<tr${m.remake ? ' class="dim"' : ''}><td>${fmtDate(m.date)}</td><td>${QUEUE_NAMES[m.queueId] ?? 'Ranked'}</td>
       <td><span class="champ">${initials2(m.champion)}</span>${esc(m.champion)}</td><td>${esc(ROLE_NAMES[m.role] ?? '—')}</td>
-      <td><span class="wl ${m.win ? 'win' : 'loss'}">${m.win ? 'Win' : 'Loss'}</span></td>
+      <td>${m.remake ? '<span class="wl remake" title="Ended by early surrender; not counted in stats">Remake</span>'
+        : `<span class="wl ${m.win ? 'win' : 'loss'}">${m.win ? 'Win' : 'Loss'}</span>`}</td>
       <td>${m.kills} / ${m.deaths} / ${m.assists}</td><td>${m.cs}</td><td>${Math.round(m.durationMin)}m</td></tr>`).join('')
       : '<tr><td colspan="8" class="empty">No ranked games this season yet.</td></tr>';
     $('lolMore').hidden = l.matches.length <= view.lolShown;

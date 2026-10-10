@@ -1,8 +1,6 @@
 import type { LolParticipantRow } from './store';
 import type { LolChampionStats, LolMatchRow, LolProfile, LolQueue, LolRank } from './types';
 
-const QUEUES: Record<number, LolQueue> = { 420: 'RANKED_SOLO_5x5', 440: 'RANKED_FLEX_SR' };
-
 const round = (n: number, places: number) => Math.round(n * 10 ** places) / 10 ** places;
 const kdaOf = (rows: LolParticipantRow[]) => {
   const k = rows.reduce((t, r) => t + r.kills, 0);
@@ -11,16 +9,23 @@ const kdaOf = (rows: LolParticipantRow[]) => {
   return round((k + a) / Math.max(1, d), 2);
 };
 
+function rankOf(ranks: Array<LolRank & { queue: LolQueue }>, queue: LolQueue): LolRank | null {
+  const r = ranks.find((x) => x.queue === queue);
+  if (!r) return null;
+  const { queue: _queue, ...rank } = r;
+  return rank;
+}
+
 /** A season of ranked games (newest first) + current ranks -> the LoL profile response. */
 export function buildLolProfile(input: {
   riotId: string;
   region: string;
   season: number;
   rows: LolParticipantRow[];
-  ranks: { solo: LolRank | null; flex: LolRank | null };
+  ranks: Array<LolRank & { queue: LolQueue }>;
   history: { complete: boolean; syncing: boolean };
 }): LolProfile {
-  const { rows } = input;
+  const rows = input.rows.filter((r) => !r.remake); // remakes are listed but never counted
   const games = rows.length;
   const wins = rows.filter((r) => r.win).length;
   const minutes = rows.reduce((t, r) => t + r.duration, 0) / 60;
@@ -41,10 +46,11 @@ export function buildLolProfile(input: {
     .map(([role, rs]) => ({ role, games: rs.length, winRate: round(rs.filter((r) => r.win).length / rs.length, 3) }))
     .sort((a, b) => b.games - a.games);
 
-  const matches: LolMatchRow[] = rows.map((r) => ({
+  const matches: LolMatchRow[] = input.rows.map((r) => ({
     matchId: r.matchId,
     date: new Date(r.gameEnd).toISOString().slice(0, 10),
-    queue: QUEUES[r.queueId] ?? 'RANKED_SOLO_5x5',
+    queueId: r.queueId,
+    remake: r.remake,
     champion: r.champion,
     role: r.role,
     win: r.win,
@@ -61,8 +67,13 @@ export function buildLolProfile(input: {
     riotId: input.riotId,
     region: input.region,
     season: input.season,
-    ranks: input.ranks,
+    ranks: {
+      solo: rankOf(input.ranks, 'RANKED_SOLO_5x5'),
+      flex: rankOf(input.ranks, 'RANKED_FLEX_SR'),
+    },
+    otherRanks: input.ranks.filter((r) => r.queue !== 'RANKED_SOLO_5x5' && r.queue !== 'RANKED_FLEX_SR'),
     games,
+    remakes: input.rows.length - rows.length,
     wins,
     winRate: games ? round(wins / games, 3) : 0,
     kills: avg('kills'),
