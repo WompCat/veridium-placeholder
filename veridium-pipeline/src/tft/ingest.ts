@@ -1,5 +1,5 @@
 import type { Store } from '../cache/store';
-import type { RiotClient } from '../riot/client';
+import type { Priority, RiotClient } from '../riot/client';
 import { regionalFor, type RegionalRoute } from '../riot/regions';
 import type { PlayerProfile } from '../types';
 import { buildProfile, trackedSets } from './aggregate';
@@ -33,9 +33,14 @@ export function parseRiotId(riotId: string): { gameName: string; tagLine: string
   return { gameName: riotId.slice(0, sep), tagLine: riotId.slice(sep + 1) };
 }
 
-async function fetchUncached(deps: IngestDeps, regional: RegionalRoute, ids: string[]): Promise<string[]> {
+async function fetchUncached(
+  deps: IngestDeps,
+  regional: RegionalRoute,
+  ids: string[],
+  priority: Priority = 'foreground',
+): Promise<string[]> {
   const missing = ids.filter((id) => !deps.store.hasMatch(id));
-  const fetched = await Promise.all(missing.map((id) => deps.client.getMatch(regional, id)));
+  const fetched = await Promise.all(missing.map((id) => deps.client.getMatch(regional, id, priority)));
   for (const raw of fetched) deps.store.saveMatch(raw, toMatchups(raw));
   return missing;
 }
@@ -81,10 +86,10 @@ export function backfillHistory(deps: IngestDeps, regional: RegionalRoute, puuid
     if (minSet === null) return;
     let oldStreak = 0;
     for (let start = 0; ; start += HISTORY_PAGE) {
-      const ids = await deps.client.getMatchIds(regional, puuid, { start, count: HISTORY_PAGE });
+      const ids = await deps.client.getMatchIds(regional, puuid, { start, count: HISTORY_PAGE, priority: 'background' });
       for (let i = 0; i < ids.length && oldStreak < OLD_STREAK_TO_STOP; i += DETAIL_CHUNK) {
         const chunk = ids.slice(i, i + DETAIL_CHUNK);
-        await fetchUncached(deps, regional, chunk);
+        await fetchUncached(deps, regional, chunk, 'background');
         for (const id of chunk) {
           const set = deps.store.matchSet(id);
           oldStreak = set !== null && set < minSet ? oldStreak + 1 : 0;

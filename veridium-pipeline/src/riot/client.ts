@@ -23,6 +23,14 @@ export const DEV_KEY_LIMITS: RateWindow[] = [
  * `windowMs` after it was spent. That keeps us under Riot's limits even when their
  * window boundaries don't line up with ours. A request waits until every window has a token.
  */
+/**
+ * Share of each window background work (history backfills) may use. The rest is kept free for
+ * requests someone is waiting on, so loading a profile never queues behind a backfill.
+ */
+export const BACKGROUND_SHARE = 0.75;
+
+export type Priority = 'foreground' | 'background';
+
 export class RateLimiter {
   private spent: number[][];
 
@@ -34,14 +42,16 @@ export class RateLimiter {
     this.spent = windows.map(() => []);
   }
 
-  async acquire(): Promise<void> {
+  async acquire(priority: Priority = 'foreground'): Promise<void> {
     for (;;) {
       const t = this.now();
       let wait = 0;
       this.windows.forEach((w, i) => {
         const spent = this.spent[i];
         while (spent.length && spent[0] <= t - w.windowMs) spent.shift();
-        if (spent.length >= w.limit) wait = Math.max(wait, spent[0] + w.windowMs - t);
+        const limit = priority === 'background' ? Math.max(1, Math.floor(w.limit * BACKGROUND_SHARE)) : w.limit;
+        // Background waits until enough tokens age out that it's back under its share.
+        if (spent.length >= limit) wait = Math.max(wait, spent[spent.length - limit] + w.windowMs - t);
       });
       if (wait <= 0) {
         this.spent.forEach((spent) => spent.push(t));
@@ -84,12 +94,12 @@ export class RiotClient {
   }
 
   /** GET a Riot endpoint. Retries 429 (honouring Retry-After) and 5xx with backoff. */
-  async get<T>(route: string, path: string): Promise<T> {
+  async get<T>(route: string, path: string, priority: Priority = 'foreground'): Promise<T> {
     if (!this.opts.apiKey) throw new Error('RIOT_API_KEY is not set');
     const url = hostFor(route) + path;
 
     for (let attempt = 0; ; attempt++) {
-      await this.limiter.acquire();
+      await this.limiter.acquire(priority);
       const res = await this.fetchFn(url, { headers: { 'X-Riot-Token': this.opts.apiKey } });
       if (res.ok) return (await res.json()) as T;
 
@@ -111,13 +121,13 @@ export class RiotClient {
   }
 
   /** Match ids, most recent first. Page through history with `start` (Riot allows `count` up to 200). */
-  getMatchIds(regional: RegionalRoute, puuid: string, opts: { start: number; count: number }) {
+  getMatchIds(regional: RegionalRoute, puuid: string, opts: { start: number; count: number; priority?: Priority }) {
     const params = new URLSearchParams({ start: String(opts.start), count: String(opts.count) });
-    return this.get<string[]>(regional, `/tft/match/v1/matches/by-puuid/${puuid}/ids?${params}`);
+    return this.get<string[]>(regional, `/tft/match/v1/matches/by-puuid/${puuid}/ids?${params}`, opts.priority);
   }
 
-  getMatch(regional: RegionalRoute, matchId: string) {
-    return this.get<TftMatchDto>(regional, `/tft/match/v1/matches/${matchId}`);
+  getMatch(regional: RegionalRoute, matchId: string, priority?: Priority) {
+    return this.get<TftMatchDto>(regional, `/tft/match/v1/matches/${matchId}`, priority);
   }
 
   getLeagueEntries(platform: string, puuid: string) {
@@ -127,13 +137,13 @@ export class RiotClient {
   // ---- League of Legends ----
 
   /** Ranked match ids (Solo/Duo + Flex), most recent first. Riot allows `count` up to 100. */
-  getLolMatchIds(regional: RegionalRoute, puuid: string, opts: { start: number; count: number }) {
+  getLolMatchIds(regional: RegionalRoute, puuid: string, opts: { start: number; count: number; priority?: Priority }) {
     const params = new URLSearchParams({ type: 'ranked', start: String(opts.start), count: String(opts.count) });
-    return this.get<string[]>(regional, `/lol/match/v5/matches/by-puuid/${puuid}/ids?${params}`);
+    return this.get<string[]>(regional, `/lol/match/v5/matches/by-puuid/${puuid}/ids?${params}`, opts.priority);
   }
 
-  getLolMatch(regional: RegionalRoute, matchId: string) {
-    return this.get<LolMatchDto>(regional, `/lol/match/v5/matches/${matchId}`);
+  getLolMatch(regional: RegionalRoute, matchId: string, priority?: Priority) {
+    return this.get<LolMatchDto>(regional, `/lol/match/v5/matches/${matchId}`, priority);
   }
 
   getLolLeagueEntries(platform: string, puuid: string) {

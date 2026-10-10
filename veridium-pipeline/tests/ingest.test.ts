@@ -194,6 +194,26 @@ describe('RateLimiter', () => {
   });
 });
 
+describe('RateLimiter priority', () => {
+  it('keeps a quarter of each window free for foreground requests', async () => {
+    let t = 0;
+    const waits: Array<[string, number]> = [];
+    let who = '';
+    const limiter = new RateLimiter([{ limit: 4, windowMs: 1000 }], () => t, async (ms) => {
+      waits.push([who, ms]);
+      t += ms;
+    });
+    who = 'bg';
+    for (let i = 0; i < 3; i++) await limiter.acquire('background'); // 3 of 4: the background share
+    who = 'fg';
+    await limiter.acquire('foreground'); // the reserved slot: no wait
+    expect(waits).toEqual([]);
+    who = 'bg';
+    await limiter.acquire('background'); // must wait for the window to roll over
+    expect(waits).toEqual([['bg', 1000]]);
+  });
+});
+
 describe('buildProfile LP tracking', () => {
   it('derives lpChange when snapshots bracket exactly one ranked game', () => {
     const hour = 3_600_000;
