@@ -840,7 +840,8 @@
     try {
       // Applications are private: only fetched on your own profile.
       const [apps, openings] = await Promise.all([
-        isOwnProfile() ? fetch(`${playerPath}/applications`).then(jsonOrThrow) : [],
+        // (and not while the Terms dialog is waiting: the API would refuse until they're accepted)
+        isOwnProfile() && Veridium.getAccount()?.termsAccepted !== false ? fetch(`${playerPath}/applications`).then(jsonOrThrow) : [],
         fetch('/api/vacancies').then(jsonOrThrow),
       ]);
       renderApplications(apps);

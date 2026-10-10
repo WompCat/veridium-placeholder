@@ -110,6 +110,17 @@ export class OrgRepo {
     return org;
   }
 
+  /** Deletes an org with its roster history, vacancies and their applications. */
+  deleteOrganization(id: string): void {
+    this.db.transaction(() => {
+      this.db.prepare('DELETE FROM applications WHERE vacancy_id IN (SELECT id FROM vacancies WHERE organization_id = ?)').run(id);
+      this.db.prepare('DELETE FROM vacancies WHERE organization_id = ?').run(id);
+      this.db.prepare('DELETE FROM org_memberships WHERE organization_id = ?').run(id);
+      this.db.prepare('DELETE FROM org_admins WHERE organization_id = ?').run(id);
+      this.db.prepare('DELETE FROM organizations WHERE id = ?').run(id);
+    })();
+  }
+
   /** Every org with its current roster size and open vacancies. */
   listOrganizations(): Array<Organization & { rosterSize: number; openVacancies: number }> {
     const rows = this.db

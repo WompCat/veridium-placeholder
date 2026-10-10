@@ -4,7 +4,7 @@ import type { AuthRepo } from '../auth/repo';
 import { buildFeed, listPlayerSummaries } from '../feed';
 import { badRequest, conflict, forbidden, HttpError, notFound } from '../orgs/errors';
 import { playerSummary } from '../orgs/players';
-import type { NewVacancy, OrgRepo, VacancyPatch } from '../orgs/repo';
+import { slugify, type NewVacancy, type OrgRepo, type VacancyPatch } from '../orgs/repo';
 import { parseRiotId, type IngestDeps } from '../tft/ingest';
 import type { MembershipStatus, PlayerSummary, VacancyLevel, VacancyStatus } from '../types';
 
@@ -73,7 +73,7 @@ function summary(deps: OrgDeps, puuid: string): PlayerSummary {
 
 export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   if (err instanceof HttpError) {
-    res.status(err.status).json({ error: err.message });
+    res.status(err.status).json({ error: err.message, ...(err.code && { code: err.code }) });
     return;
   }
   if (err?.type === 'entity.parse.failed') {
@@ -97,21 +97,26 @@ export function organizationsRouter(deps: OrgDeps): Router {
     res.json(orgs.listOrganizations());
   });
 
+  // Any logged-in account can create an organization and becomes its admin.
+  router.post('/', (req, res) => {
+    const user = requireUser(req);
+    const name = text(body(req), 'name', { required: true, max: 60 });
+    const id = slugify(name);
+    if (!id) throw badRequest('Use letters or numbers in the organization name.');
+    if (orgs.getOrganization(id)) throw conflict('An organization with that name already exists.');
+    const org = deps.store.db.transaction(() => {
+      const created = orgs.createOrganization(name, id);
+      deps.auth.addOrgAdmin(created.id, user.id);
+      return created;
+    })();
+    res.status(201).json({ ...org, rosterSize: 0, viewer: { loggedIn: true, isAdmin: true } });
+  });
+
   // `viewer` tells the dashboard what the current account may do here.
   router.get('/:id', (req, res) => {
     const org = orgs.requireOrganization(req.params.id);
     const isAdmin = !!req.user && deps.auth.isOrgAdmin(org.id, req.user.id);
-    const canClaim = !deps.auth.orgHasAdmins(org.id);
-    res.json({ ...org, rosterSize: orgs.listRoster(org.id).length, viewer: { loggedIn: !!req.user, isAdmin, canClaim } });
-  });
-
-  // An org nobody manages yet (e.g. one created by the seed script) can be claimed by its first admin.
-  router.post('/:id/claim', (req, res) => {
-    const user = requireUser(req);
-    const org = orgs.requireOrganization(req.params.id);
-    if (deps.auth.orgHasAdmins(org.id)) throw conflict('This organization already has an admin.');
-    deps.auth.addOrgAdmin(org.id, user.id);
-    res.status(201).json({ organizationId: org.id, isAdmin: true });
+    res.json({ ...org, rosterSize: orgs.listRoster(org.id).length, viewer: { loggedIn: !!req.user, isAdmin } });
   });
 
   const adminOf = (req: Request) => requireOrgAdmin(deps.auth, req, orgs.requireOrganization(String(req.params.id)).id);

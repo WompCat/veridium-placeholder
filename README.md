@@ -4,7 +4,8 @@ Verified esports player profiles. `veridium-pipeline/` holds:
 
 - **TFT / Riot API ingestion pipeline** (rebuild step 1) and the Player Profile page (`/`)
 - **Organization & vacancy backend** (rebuild steps 3–4): rosters, vacancy postings and applications,
-  with the Org Dashboard (`/org.html?id=obscurity-esports`) and Jobs page (`/jobs.html`)
+  with the Organizations directory (`/organizations.html`), Org Dashboard and Jobs page (`/jobs.html`)
+- **Accounts** with a Privacy Policy (`/privacy.html`) and Terms of Service (`/terms.html`) to accept
 
 ## Quick start (Windows / PowerShell)
 
@@ -14,12 +15,11 @@ cd "C:\Users\Anthony\Projects\Veridium Placeholder\veridium-pipeline"
 git checkout claude/build-order-review-rbzbu7
 npm install
 copy .env.example .env      # then paste your RIOT_API_KEY into .env
-npm run seed                # creates the Obscurity Esports org record (safe to re-run)
 npm test                    # mocked Riot responses, no key needed
 npm run ingest -- "WompCat#NA1" na1   # one live ingestion run, prints the profile JSON
 npm run dev                 # http://localhost:4000/  (home)
                             # http://localhost:4000/player.html?riotId=WompCat%23NA1&region=na1
-                            # http://localhost:4000/org.html?id=obscurity-esports
+                            # http://localhost:4000/organizations.html  (sign up, then create an org)
 ```
 
 Riot development keys expire every 24 hours, so regenerate yours at
@@ -144,8 +144,17 @@ its SHA-256, and passwords only as scrypt hashes. Failed logins are throttled pe
 | A logged-in player (Riot ID linked) | apply to vacancies as themselves; see their own applications and results |
 | An org admin | manage the roster, post/close vacancies, see applicants and accept/reject |
 
-An org with no admin yet (like the seeded Obscurity Esports) shows **Claim this organization** to
-logged-in users; the first to claim it becomes its admin.
+Any logged-in account can **create an organization** (Organizations page) and becomes its admin.
+
+**Terms of Service and Privacy Policy.** `/terms.html` and `/privacy.html` describe what the code
+actually does (what's collected, who sees what, the one session cookie, deletion). Sign-up needs a
+"I'm at least 13 and I agree" checkbox; the accepted version and time are stored on the account.
+The version lives in `src/legal.ts` (`TERMS_VERSION`): bump it, and the dates on both pages, when
+either changes materially, and every account is asked to accept again before anything that needs a
+login works (the API answers `403` with `code: "terms_required"`). Accounts can be deleted from
+Account settings (password required): that removes the account, its sessions, its applications and
+any org it's the only admin of. Set `CONTACT_EMAIL` to show a contact address on both pages.
+These were written for this app, not by a lawyer, so have them reviewed before a public launch.
 
 Not verified yet: that the person linking a Riot ID owns it. Riot only offers that through Riot Sign
 On (RSO), which needs an approved production key; until then, uniqueness stops two accounts from
@@ -177,8 +186,11 @@ their profile.
 | `POST /api/auth/login` · `POST /api/auth/logout` | `{ email, password }` · ends the session |
 | `GET /api/auth/me` | `{ user: { email, player, adminOf } \| null }` |
 | `PUT /api/auth/me/player` | `{ riotId, region }` links a Riot ID; `{ riotId: null }` unlinks |
-| `GET /api/organizations/:id` | org name, roster size, and `viewer: { loggedIn, isAdmin, canClaim }` |
-| `POST /api/organizations/:id/claim` | logged in: become the admin of an org that has none |
+| `GET /api/organizations/:id` | org name, roster size, and `viewer: { loggedIn, isAdmin }` |
+| `POST /api/organizations` | logged in: `{ name }` creates an org and makes you its admin |
+| `POST /api/auth/accept-terms` | `{ version }`: accept the current Terms and Privacy Policy |
+| `DELETE /api/auth/me` | `{ password }`: delete the account (see Accounts above) |
+| `GET /api/legal` | `{ termsVersion, contactEmail }` |
 | `GET /api/organizations/:id/roster` | active then bench members, each with `player` stats |
 | `POST /api/organizations/:id/roster` | `{ playerPuuid \| riotId+region, role, status? }` |
 | `PATCH /api/organizations/:id/roster/:playerPuuid` | `{ role?, status? }` (`active` / `bench`) |
@@ -209,18 +221,17 @@ application history. Errors use `400` (bad input), `404` (missing org/player/vac
 ### Migrations
 
 `migrations/NNN_name.sql` files run in order the first time the store opens a database (server,
-CLI, seed or tests), and each is recorded in `schema_migrations`. `001_pipeline.sql` is the
+CLI or tests), and each is recorded in `schema_migrations`. `001_pipeline.sql` is the
 pipeline schema with `IF NOT EXISTS`, so databases from before migrations existed adopt it
 unchanged. To change the schema, add the next numbered file. Never edit one that has already shipped.
 
 ### Open decisions
 
 - **Riot ID ownership.** Linking a Riot ID isn't proven yet (needs Riot Sign On). See Accounts above.
-- **Creating orgs.** Orgs come from the seed and are claimed by their first admin; there's no
-  "create an organization" flow or way to add more admins yet.
+- **More than one admin per org.** The creator is the only admin; there's no way to invite others yet.
 - **Free vs paid vacancy postings.** There's no `plan` / `billingStatus` on `Organization` yet. Add
   it in a new migration once that's decided.
-- **Obscurity Esports** is created by `npm run seed`, not by a migration, so it's easy to change or drop.
+- **Obscurity Esports** was a test org from an old seed script; migration `007_remove_test_org.sql` removes it.
 
 ## Deploying (Render)
 
@@ -228,8 +239,8 @@ The app is one Node process plus a sqlite file, so it needs a host with a **pers
 Serverless hosts (Vercel, Netlify functions) won't work, because the database would vanish
 between requests. The repo is set up for [Render](https://render.com):
 
-- `veridium-pipeline/Dockerfile` builds the app. On every boot it applies new migrations, runs
-  the idempotent seed, and starts the server.
+- `veridium-pipeline/Dockerfile` builds the app. On every boot it applies new migrations and
+  starts the server.
 - `render.yaml` (a Render Blueprint) declares the web service, a 1 GB disk mounted at
   `/var/data`, `DB_PATH=/var/data/veridium.db` on that disk, and the env vars to fill in.
   Disks need a paid instance type, so the Blueprint uses `starter`. Check Render's current pricing.
@@ -241,7 +252,7 @@ between requests. The repo is set up for [Render](https://render.com):
 2. In Render: **New → Blueprint**, connect the `veridium-placeholder` GitHub repo, and apply.
 3. When prompted, set **`RIOT_API_KEY`** (the bare `RGAPI-…` key) and **`SITE_PASSWORD`**.
 4. Render builds the image and gives you an `https://veridium-….onrender.com` URL. Visit
-   `/api/health` (open without the password), then `/org.html?id=obscurity-esports`.
+   `/api/health` (open without the password), then sign up and create your organization.
 
 **Production settings**
 
@@ -250,7 +261,8 @@ between requests. The repo is set up for [Render](https://render.com):
 | `RIOT_API_KEY` | set in Render's dashboard; never committed (`.env` is gitignored) |
 | `DB_PATH` | `/var/data/veridium.db`, which must sit on the disk mount or data is lost on redeploy |
 | `SEASONS` | `3` |
-| `SITE_PASSWORD` | puts the whole site behind a browser password prompt. Recommended while Riot ID ownership isn't verified and orgs can be claimed by the first person to log in |
+| `SITE_PASSWORD` | puts the whole site behind a browser password prompt. Recommended while Riot ID ownership isn't verified |
+| `CONTACT_EMAIL` | the address shown on the Privacy Policy and Terms for privacy and account requests |
 | `PORT` | injected by Render; the app reads `process.env.PORT` (4000 is only the local default) |
 | `HOST` | `0.0.0.0` by default, so Render can route traffic in |
 

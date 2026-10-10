@@ -1,5 +1,6 @@
 import type { Request, RequestHandler, Response } from 'express';
-import { forbidden, unauthorized } from '../orgs/errors';
+import { TERMS_VERSION } from '../legal';
+import { forbidden, HttpError, unauthorized } from '../orgs/errors';
 import { SESSION_DAYS, type AuthRepo, type User } from './repo';
 
 declare global {
@@ -49,9 +50,19 @@ export function clearSessionCookie(req: Request, res: Response) {
   res.clearCookie(SESSION_COOKIE, { httpOnly: true, sameSite: 'lax', secure: req.secure, path: '/' });
 }
 
-export function requireUser(req: Request): User {
+/** Logged in, whatever Terms version was accepted: for accepting the Terms, logging out, deleting the account. */
+export function requireSession(req: Request): User {
   if (!req.user) throw unauthorized();
   return req.user;
+}
+
+/** Logged in and on the current Terms of Service / Privacy Policy. Everything else that needs a login uses this. */
+export function requireUser(req: Request): User {
+  const user = requireSession(req);
+  if (user.termsVersion !== TERMS_VERSION) {
+    throw new HttpError(403, 'Please review and accept the updated Terms of Service and Privacy Policy to continue.', 'terms_required');
+  }
+  return user;
 }
 
 /** The logged-in account's linked player: what applications are made as. */

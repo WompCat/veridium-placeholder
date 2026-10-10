@@ -4,6 +4,7 @@ import path from 'node:path';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AuthRepo } from '../src/auth/repo';
+import { TERMS_VERSION } from '../src/legal';
 import { Store } from '../src/cache/store';
 import { OrgRepo } from '../src/orgs/repo';
 import { RiotClient } from '../src/riot/client';
@@ -36,7 +37,7 @@ beforeEach(() => {
   app = createApp({ client: new RiotClient({ apiKey: '' }), store, seasons: 3 });
   // The org's admin manages it; players apply from their own accounts.
   auth = new AuthRepo(store.db);
-  const admin = auth.createUser('admin@obscurity.gg', 'unused-hash', null);
+  const admin = auth.createUser('admin@obscurity.gg', 'unused-hash', null, TERMS_VERSION);
   auth.addOrgAdmin(ORG, admin.id);
   adminCookie = `veridium_session=${auth.createSession(admin.id).token}`;
   playerCookies.clear();
@@ -55,7 +56,7 @@ const api = () => as(adminCookie);
 /** A logged-in account linked to this player (created on first use). */
 function playerCookie(puuid: string): string {
   if (!playerCookies.has(puuid)) {
-    const user = auth.createUser(`${puuid}@players.test`, 'unused-hash', puuid);
+    const user = auth.createUser(`${puuid}@players.test`, 'unused-hash', puuid, TERMS_VERSION);
     playerCookies.set(puuid, `veridium_session=${auth.createSession(user.id).token}`);
   }
   return playerCookies.get(puuid)!;
@@ -88,6 +89,8 @@ describe('migrations', () => {
       { version: '004_lol.sql' },
       { version: '005_lol_remakes.sql' },
       { version: '006_accounts.sql' },
+      { version: '007_remove_test_org.sql' },
+      { version: '008_terms.sql' },
     ]);
     const tables = reopened.db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`).all();
     expect(tables.map((t: any) => t.name)).toEqual(

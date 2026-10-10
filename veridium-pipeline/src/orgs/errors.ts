@@ -3,6 +3,8 @@ export class HttpError extends Error {
   constructor(
     public status: number,
     message: string,
+    /** Machine-readable reason the pages can act on, e.g. "terms_required". */
+    public code?: string,
   ) {
     super(message);
   }

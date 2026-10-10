@@ -8,6 +8,8 @@ export const config = {
   // When set, every page and API route (except /api/health) requires this password (HTTP Basic auth).
   sitePassword: process.env.SITE_PASSWORD || '',
   dbPath: process.env.DB_PATH || './data/veridium.db',
+  // Shown on the Privacy Policy and Terms as the address for privacy and account requests.
+  contactEmail: process.env.CONTACT_EMAIL || '',
   // Seasons (TFT sets) to keep full history for: the current one plus SEASONS - 1 previous.
   seasons: Number(process.env.SEASONS || 3),
 };

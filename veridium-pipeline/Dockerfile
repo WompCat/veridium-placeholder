@@ -19,6 +19,5 @@ ENV NODE_ENV=production \
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 EXPOSE 4000
-# Opening the store applies any new migrations; the seed is idempotent (creates Obscurity
-# Esports only if it's missing). Then the server takes over the process.
-CMD ["sh", "-c", "node_modules/.bin/tsx src/seed.ts && exec node_modules/.bin/tsx src/server.ts"]
+# Opening the store applies any new migrations, then the server takes over the process.
+CMD ["node_modules/.bin/tsx", "src/server.ts"]

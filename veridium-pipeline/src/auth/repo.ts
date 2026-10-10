@@ -7,6 +7,9 @@ export interface User {
   email: string;
   playerPuuid: string | null;
   createdAt: string;
+  /** The Terms/Privacy version this account accepted (null: never). */
+  termsVersion: string | null;
+  termsAcceptedAt: string | null;
 }
 
 interface UserRow {
@@ -15,9 +18,18 @@ interface UserRow {
   password_hash: string;
   player_puuid: string | null;
   created_at: string;
+  terms_version: string | null;
+  terms_accepted_at: string | null;
 }
 
-const toUser = (r: UserRow): User => ({ id: r.id, email: r.email, playerPuuid: r.player_puuid, createdAt: r.created_at });
+const toUser = (r: UserRow): User => ({
+  id: r.id,
+  email: r.email,
+  playerPuuid: r.player_puuid,
+  createdAt: r.created_at,
+  termsVersion: r.terms_version,
+  termsAcceptedAt: r.terms_accepted_at,
+});
 
 export const SESSION_DAYS = 30;
 const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
@@ -31,19 +43,26 @@ export class AuthRepo {
 
   // ---- Users ----
 
-  createUser(email: string, passwordHash: string, playerPuuid: string | null): User {
+  /** `termsVersion`: the Terms/Privacy version accepted at sign-up. */
+  createUser(email: string, passwordHash: string, playerPuuid: string | null, termsVersion: string | null): User {
     if (this.findByEmail(email)) throw conflict('An account with that email already exists. Log in instead.');
     if (playerPuuid) this.assertPlayerFree(playerPuuid);
+    const createdAt = this.now().toISOString();
     const row: UserRow = {
       id: randomUUID(),
       email,
       password_hash: passwordHash,
       player_puuid: playerPuuid,
-      created_at: this.now().toISOString(),
+      created_at: createdAt,
+      terms_version: termsVersion,
+      terms_accepted_at: termsVersion ? createdAt : null,
     };
     try {
       this.db
-        .prepare('INSERT INTO users (id, email, password_hash, player_puuid, created_at) VALUES (@id, @email, @password_hash, @player_puuid, @created_at)')
+        .prepare(
+          `INSERT INTO users (id, email, password_hash, player_puuid, created_at, terms_version, terms_accepted_at)
+           VALUES (@id, @email, @password_hash, @player_puuid, @created_at, @terms_version, @terms_accepted_at)`,
+        )
         .run(row);
     } catch (err) {
       // Lost a race with a simultaneous signup for the same email or Riot ID.
@@ -68,6 +87,16 @@ export class AuthRepo {
     if (playerPuuid) this.assertPlayerFree(playerPuuid, userId);
     this.db.prepare('UPDATE users SET player_puuid = ? WHERE id = ?').run(playerPuuid, userId);
     return this.getUser(userId)!;
+  }
+
+  acceptTerms(userId: string, version: string): User {
+    this.db.prepare('UPDATE users SET terms_version = ?, terms_accepted_at = ? WHERE id = ?').run(version, this.now().toISOString(), userId);
+    return this.getUser(userId)!;
+  }
+
+  /** Deletes the account; its sessions and admin roles go with it (ON DELETE CASCADE). */
+  deleteUser(userId: string): void {
+    this.db.prepare('DELETE FROM users WHERE id = ?').run(userId);
   }
 
   private assertPlayerFree(puuid: string, exceptUserId?: string) {
@@ -121,12 +150,16 @@ export class AuthRepo {
       .run(orgId, userId, this.now().toISOString());
   }
 
-  adminOrgs(userId: string): Array<{ id: string; name: string }> {
-    return this.db
+  /** Orgs this account manages; `onlyAdmin` when nobody else does (deleting the account deletes those). */
+  adminOrgs(userId: string): Array<{ id: string; name: string; onlyAdmin: boolean }> {
+    const rows = this.db
       .prepare(
-        `SELECT o.id, o.name FROM org_admins a JOIN organizations o ON o.id = a.organization_id
+        `SELECT o.id, o.name,
+                (SELECT COUNT(*) FROM org_admins x WHERE x.organization_id = o.id) AS admins
+         FROM org_admins a JOIN organizations o ON o.id = a.organization_id
          WHERE a.user_id = ? ORDER BY o.name`,
       )
-      .all(userId) as Array<{ id: string; name: string }>;
+      .all(userId) as Array<{ id: string; name: string; admins: number }>;
+    return rows.map((r) => ({ id: r.id, name: r.name, onlyAdmin: r.admins === 1 }));
   }
 }

@@ -41,6 +41,15 @@
   .account-rows dd { margin: 0; font-weight: 600; text-align: right; overflow-wrap: anywhere; }
   .linkbox { border: 1px dashed #c7cbff; background: var(--accent-soft); border-radius: 12px; padding: 16px; margin-bottom: 18px; }
   .linkbox h3 { margin: 0 0 4px; font-size: 15px; }
+  .agree { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--text); line-height: 1.5; cursor: pointer; }
+  .agree input { width: 18px !important; height: 18px; margin: 1px 0 0; padding: 0 !important; accent-color: var(--accent); flex: 0 0 18px; }
+  .agree span { flex: 1 1 auto; min-width: 0; }
+  .danger { margin-top: 26px; border-top: 1px solid var(--border); padding-top: 18px; }
+  .danger summary { cursor: pointer; font-weight: 600; color: var(--bad); font-size: 14px; }
+  .danger p, .danger li { font-size: 13px; color: var(--muted); line-height: 1.55; }
+  .danger ul { padding-left: 18px; margin: 6px 0 12px; }
+  .danger input { width: 100%; border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; font: inherit; margin: 4px 0 10px; }
+  .btn.danger-btn { background: var(--bad); border-color: var(--bad); color: #fff; }
   @media (max-width: 860px) { .auth-grid { grid-template-columns: minmax(0, 1fr); gap: 24px; } .pitch { order: 2; } main.auth { padding-top: 20px; } .pitch h1 { font-size: 26px; } }
 </style>
 </head>
@@ -92,10 +101,14 @@
             </div>
             <span class="hint">We look it up with Riot and load your verified match history.</span>
           </div>
+          <label class="agree"><input type="checkbox" name="acceptTerms" />
+            <span>I'm at least 13, and I agree to the <a href="terms.html" target="_blank" rel="noopener">Terms of Service</a> and
+              <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</span></label>
           <button class="btn primary">Create account</button>
           <div class="form-msg" id="signupMsg" role="alert"></div>
         </form>
-        <div class="fine">Veridium isn't endorsed by Riot Games. Your password is stored only as a secure hash.</div>
+        <div class="fine">Veridium isn't endorsed by Riot Games. Your password is stored only as a secure hash.<br>
+          <a href="privacy.html">Privacy Policy</a> · <a href="terms.html">Terms of Service</a></div>
       </div>
 
       <!-- Logged in: account settings -->
@@ -117,8 +130,20 @@
         <dl class="account-rows" id="accountRows"></dl>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <a class="btn primary" id="continueBtn" href="/">Continue</a>
+          <a class="btn" href="organizations.html#create">Create an organization</a>
           <button class="btn" id="logoutBtn2" type="button">Log out</button>
         </div>
+        <details class="danger">
+          <summary>Delete account</summary>
+          <p>This permanently deletes:</p>
+          <ul id="deleteList"></ul>
+          <p>Public Riot game data for your Riot ID stays on Veridium, like it does for any Riot ID. This can't be undone.</p>
+          <form id="deleteForm">
+            <label class="field">Enter your password to confirm<input name="password" type="password" autocomplete="current-password" required /></label>
+            <button class="btn danger-btn">Delete my account</button>
+            <div class="form-msg" id="deleteMsg" role="alert"></div>
+          </form>
+        </details>
       </div>
     </section>
   </div>
@@ -200,7 +225,8 @@
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email)) return setMsg($('signupMsg'), 'Enter a valid email address.', 'error');
     if (f.password.length < 8) return setMsg($('signupMsg'), 'Use a password of at least 8 characters.', 'error');
     if (f.riotId && !f.riotId.includes('#')) return setMsg($('signupMsg'), 'Riot IDs look like Name#TAG.', 'error');
-    const payload = { email: f.email, password: f.password, ...(f.riotId.trim() && { riotId: f.riotId.trim(), region: f.region }) };
+    if (!f.acceptTerms) return setMsg($('signupMsg'), 'Please accept the Terms of Service and Privacy Policy to continue.', 'error');
+    const payload = { email: f.email, password: f.password, acceptTerms: true, ...(f.riotId.trim() && { riotId: f.riotId.trim(), region: f.region }) };
     const user = await submit(e.target, $('signupMsg'), '/api/auth/signup', payload,
       payload.riotId ? 'Creating your account and loading your match history from Riot…' : 'Creating your account…');
     if (user) location.href = destination(user);
@@ -226,13 +252,38 @@
       ['Organizations', account.adminOf?.length
         ? account.adminOf.map((o) => `<a href="org.html?id=${encodeURIComponent(o.id)}">${esc(o.name)}</a>`).join(', ')
         : '<span class="dim">None yet</span>'],
+      ['Terms & Privacy', account.termsAccepted ? 'Accepted' : '<span class="dim">Not accepted yet</span>'],
     ];
+    const soleOrgs = (account.adminOf || []).filter((o) => o.onlyAdmin);
+    $('deleteList').innerHTML = [
+      'Your account, email address and password',
+      me ? `The link to ${esc(me.riotId)} and the applications you've made` : null,
+      ...soleOrgs.map((o) => `<b>${esc(o.name)}</b>, since you're its only admin (roster, vacancies and applicants)`),
+    ].filter(Boolean).map((x) => `<li>${x}</li>`).join('');
     $('accountRows').innerHTML = rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
     $('continueBtn').href = destination(account);
     $('continueBtn').textContent = nextUrl ? 'Continue' : me ? 'Go to my profile' : 'Go to home';
     if (location.hash === '#link' && !me) $('linkForm').riotId.focus();
   }
   $('logoutBtn2').addEventListener('click', () => Veridium.logout());
+
+  $('deleteForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!confirm('Delete your Veridium account permanently?')) return;
+    const btn = e.target.querySelector('button');
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/auth/me', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: e.target.password.value }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Something went wrong');
+      Veridium.signedIn(null);
+      location.href = 'welcome.html';
+    } catch (err) {
+      setMsg($('deleteMsg'), err.message, 'error');
+      btn.disabled = false;
+    }
+  });
 
   setMode(params.get('mode') === 'signup' ? 'signup' : 'login');
   const cached = Veridium.getAccount();

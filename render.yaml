@@ -22,6 +22,8 @@ services:
         value: "3"
       - key: RIOT_API_KEY
         sync: false # entered in the dashboard; dev keys expire every 24h
+      - key: CONTACT_EMAIL
+        sync: false # shown on the Privacy Policy and Terms for privacy/account requests
       - key: SITE_PASSWORD
         sync: false # recommended: keeps the site private while orgs are claimed by their first admin
       # PORT is injected by Render; the app reads process.env.PORT.

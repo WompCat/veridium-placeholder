@@ -1,7 +1,8 @@
 import { Router, type Request } from 'express';
 import { DUMMY_HASH, hashPassword, verifyPassword } from '../auth/passwords';
 import type { AuthRepo, User } from '../auth/repo';
-import { clearSessionCookie, requireUser, sessionToken, setSessionCookie } from '../auth/http';
+import { clearSessionCookie, requireSession, requireUser, sessionToken, setSessionCookie } from '../auth/http';
+import { TERMS_VERSION } from '../legal';
 import { badRequest, HttpError, notFound } from '../orgs/errors';
 import { RiotApiError } from '../riot/client';
 import { isPlatform } from '../riot/regions';
@@ -27,6 +28,8 @@ function accountView(deps: AuthDeps, user: User) {
     email: user.email,
     player: player ? { puuid: player.puuid, riotId: `${player.gameName}#${player.tagLine}`, region: player.region } : null,
     adminOf: deps.auth.adminOrgs(user.id),
+    termsAccepted: user.termsVersion === TERMS_VERSION,
+    termsAcceptedAt: user.termsAcceptedAt,
   };
 }
 
@@ -85,11 +88,12 @@ export function authRouter(deps: AuthDeps): Router {
     if (!EMAIL.test(email) || email.length > 254) throw badRequest('Enter a valid email address.');
     if (password.length < MIN_PASSWORD) throw badRequest(`Use a password of at least ${MIN_PASSWORD} characters.`);
     if (password.length > 200) throw badRequest('That password is too long.');
+    if (b.acceptTerms !== true) throw badRequest('Please accept the Terms of Service and Privacy Policy to create an account.');
     if (auth.findByEmail(email)) throw new HttpError(409, 'An account with that email already exists. Log in instead.');
 
     const riotId = str(b, 'riotId');
     const puuid = riotId ? await resolveRiotId(deps, riotId, str(b, 'region') || 'na1') : null;
-    const user = auth.createUser(email, await hashPassword(password), puuid);
+    const user = auth.createUser(email, await hashPassword(password), puuid, TERMS_VERSION);
     setSessionCookie(req, res, auth.createSession(user.id).token);
     res.status(201).json({ user: accountView(deps, user) });
   });
@@ -113,6 +117,30 @@ export function authRouter(deps: AuthDeps): Router {
   router.post('/logout', (req, res) => {
     const token = sessionToken(req);
     if (token) auth.deleteSession(token);
+    clearSessionCookie(req, res);
+    res.status(204).end();
+  });
+
+  // Accept the current Terms and Privacy Policy. `version` must be the one the user was shown.
+  router.post('/accept-terms', (req, res) => {
+    const user = requireSession(req);
+    if (body(req).version !== TERMS_VERSION) throw new HttpError(409, 'The Terms changed since this page loaded. Reload and review them again.');
+    res.json({ user: accountView(deps, auth.acceptTerms(user.id, TERMS_VERSION)) });
+  });
+
+  // Delete the account. Needs the password. Also removes the player's applications and any
+  // organization this account is the only admin of. Riot match data isn't personal to the
+  // account (it's public game data, cached for everyone), so it stays.
+  router.delete('/me', async (req, res) => {
+    const user = requireSession(req);
+    const full = auth.findByEmail(user.email);
+    const password = typeof body(req).password === 'string' ? (body(req).password as string) : '';
+    if (!full || !(await verifyPassword(password, full.passwordHash))) throw new HttpError(401, 'That password is incorrect.');
+    deps.store.db.transaction(() => {
+      for (const org of auth.adminOrgs(user.id)) if (org.onlyAdmin) deps.orgs.deleteOrganization(org.id);
+      if (user.playerPuuid) deps.store.db.prepare('DELETE FROM applications WHERE player_puuid = ?').run(user.playerPuuid);
+      auth.deleteUser(user.id);
+    })();
     clearSessionCookie(req, res);
     res.status(204).end();
   });

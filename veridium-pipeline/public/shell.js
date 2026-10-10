@@ -40,7 +40,10 @@
   }
   function cacheAccount(user) {
     try {
-      if (user) localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ email: user.email, player: user.player, adminOf: user.adminOf }));
+      if (user) {
+        const { email, player, adminOf, termsAccepted } = user;
+        localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ email, player, adminOf, termsAccepted }));
+      }
       else localStorage.removeItem(ACCOUNT_KEY);
     } catch {}
   }
@@ -60,7 +63,65 @@
     const changed = before !== JSON.stringify(getAccount());
     if (changed && reloadOnChange && document.body.dataset.page !== 'login') location.reload();
     else render();
+    termsGate(getAccount());
     return getAccount();
+  }
+
+  // An account that hasn't accepted the current Terms and Privacy Policy can't do anything that needs a
+  // login (the API answers 403 terms_required), so ask before anything else. The legal pages stay readable.
+  function termsGate(account) {
+    document.querySelector('.terms-gate')?.remove();
+    if (!account || account.termsAccepted !== false || document.body.dataset.page === 'legal') return;
+    const gate = document.createElement('div');
+    gate.className = 'terms-gate';
+    gate.innerHTML = `<div class="box" role="dialog" aria-modal="true" aria-labelledby="termsTitle" aria-describedby="termsText">
+        <h2 id="termsTitle">Please review our Terms and Privacy Policy</h2>
+        <p id="termsText">To keep using your Veridium account, please read and accept our Terms of Service and Privacy Policy.
+          They explain what we collect, who can see it, and how you can delete your account.</p>
+        <div class="links"><a href="terms.html" target="_blank" rel="noopener">Terms of Service ↗</a><a href="privacy.html" target="_blank" rel="noopener">Privacy Policy ↗</a></div>
+        <div class="actions"><button class="btn primary" type="button" data-accept>I accept</button><button class="btn" type="button" data-logout>Log out</button></div>
+        <div class="form-msg error" role="alert"></div>
+      </div>`;
+    document.body.append(gate);
+    document.body.style.overflow = 'hidden';
+    const accept = gate.querySelector('[data-accept]');
+    accept.focus();
+    // Keep keyboard focus inside the dialog.
+    gate.addEventListener('keydown', (e) => {
+      if (e.key !== 'Tab') return;
+      const items = [...gate.querySelectorAll('a, button')];
+      const i = items.indexOf(document.activeElement);
+      const next = e.shiftKey ? (i <= 0 ? items.length - 1 : i - 1) : (i === items.length - 1 ? 0 : i + 1);
+      e.preventDefault();
+      items[next].focus();
+    });
+    gate.querySelector('[data-logout]').addEventListener('click', logout);
+    accept.addEventListener('click', async () => {
+      accept.disabled = true;
+      try {
+        const { termsVersion } = await (await fetch('/api/legal')).json();
+        const res = await fetch('/api/auth/accept-terms', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ version: termsVersion }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Something went wrong');
+        cacheAccount(data.user);
+        location.reload(); // reload so anything the page couldn't load before acceptance loads now
+      } catch (err) {
+        gate.querySelector('.form-msg').textContent = err.message;
+        accept.disabled = false;
+      }
+    });
+  }
+
+  // Footer with the legal links on every page (the landing page has its own).
+  function footer() {
+    if (document.body.dataset.page === 'landing' || document.querySelector('.site-footer')) return;
+    const el = document.createElement('footer');
+    el.className = 'site-footer';
+    el.innerHTML = `<span>© ${new Date().getFullYear()} Veridium · Not endorsed by Riot Games.</span>
+      <nav aria-label="Legal"><a href="privacy.html">Privacy Policy</a><a href="terms.html">Terms of Service</a></nav>`;
+    document.body.append(el);
   }
 
   /** Call after logging in, signing up or linking a Riot ID: caches the account the server returned. */
@@ -153,6 +214,7 @@
   // `ready` resolves to the server's view of the account; pages that gate on login await it.
   window.Veridium = { getAccount, getMe, refreshAccount, signedIn, logout, loginHref, playerHref };
   window.Veridium.ready = refreshAccount();
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render);
-  else render();
+  const start = () => { render(); footer(); };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
 })();

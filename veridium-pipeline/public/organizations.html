@@ -17,6 +17,10 @@
   .org-row .grow { flex: 1; min-width: 0; }
   .org-row .nums { display: flex; gap: 24px; font-size: 12px; color: var(--muted); text-align: center; }
   .org-row .nums b { display: block; font-size: 18px; color: var(--text); }
+  .create-org { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
+  .create-org form { display: flex; gap: 10px; flex: 1 1 360px; }
+  .create-org input { flex: 1; min-width: 0; border: 1px solid var(--border); background: var(--bg); border-radius: 10px; padding: 10px 12px; font: inherit; }
+  .head-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
   @media (max-width: 560px) { .org-row { flex-wrap: wrap; } .org-row .nums { flex-basis: 100%; justify-content: space-around; } }
 </style>
 </head>
@@ -24,8 +28,22 @@
 <header id="site-header"></header>
 <main class="dir">
   <section class="card pad">
-    <h1 class="page">Organizations</h1>
-    <div class="sub">Teams recruiting and managing rosters on Veridium.</div>
+    <div class="head-row">
+      <div><h1 class="page">Organizations</h1>
+        <div class="sub">Teams recruiting and managing rosters on Veridium.</div></div>
+      <a class="btn primary" href="#create" id="createJump">Create an organization</a>
+    </div>
+  </section>
+  <section class="card pad" id="create" tabindex="-1" hidden>
+    <div class="create-org">
+      <div><h2 style="margin:0 0 4px">Create an organization</h2>
+        <div class="sub">You'll be its admin: manage the roster, post vacancies and review applicants.</div></div>
+      <form id="createForm">
+        <input name="name" placeholder="Organization name" maxlength="60" required aria-label="Organization name" />
+        <button class="btn primary">Create</button>
+      </form>
+    </div>
+    <div class="form-msg" id="createMsg" role="alert"></div>
   </section>
   <section class="list" id="list"><div class="card pad empty">Loading…</div></section>
 </main>
@@ -39,8 +57,35 @@
         <div class="grow"><b style="font-size:16px">${esc(o.name)}</b><div class="sub">Organization · on Veridium since ${esc(fmtDate(o.createdAt))}</div></div>
         <div class="nums"><span><b>${o.rosterSize}</b>Roster</span><span><b>${o.openVacancies}</b>Open roles</span></div>
         <span class="btn small">View dashboard</span>
-      </a>`).join('') : '<div class="card pad empty">No organizations yet. Run "npm run seed" to add Obscurity Esports.</div>';
+      </a>`).join('') : '<div class="card pad empty">No organizations yet. Create the first one to start recruiting.</div>';
   }).catch((err) => { $('list').innerHTML = `<div class="card pad empty">${esc(err.message)}</div>`; });
+
+  // Creating needs an account; logged out, the button goes to log in and comes back here.
+  function showCreate() {
+    if (!Veridium.getAccount()) {
+      location.href = Veridium.loginHref('login', {});
+      return;
+    }
+    $('create').hidden = false;
+    $('createForm').name.focus();
+  }
+  $('createJump').addEventListener('click', (e) => { e.preventDefault(); history.replaceState(null, '', '#create'); showCreate(); });
+  if (location.hash === '#create') Veridium.ready.then(showCreate);
+
+  $('createForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button');
+    btn.disabled = true;
+    setMsg($('createMsg'), 'Creating…');
+    try {
+      const org = await api('/api/organizations', { method: 'POST', body: { name: e.target.name.value.trim() } });
+      await Veridium.refreshAccount({ reloadOnChange: false }); // adds it to the account menu
+      location.href = `org.html?id=${encodeURIComponent(org.id)}#vacancies`;
+    } catch (err) {
+      setMsg($('createMsg'), err.message, 'error');
+      btn.disabled = false;
+    }
+  });
 </script>
 </body>
 </html>

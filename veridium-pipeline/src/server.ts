@@ -6,6 +6,7 @@ import { sessions } from './auth/http';
 import { AuthRepo } from './auth/repo';
 import { Store } from './cache/store';
 import { config } from './config';
+import { legalInfo } from './legal';
 import { RiotClient } from './riot/client';
 import { OrgRepo } from './orgs/repo';
 import {
@@ -58,6 +59,9 @@ export function createApp(
   app.use('/api/vacancies', vacanciesRouter(orgDeps));
   app.use('/api/applications', applicationsRouter(orgDeps));
   app.use('/api/feed', feedRouter(orgDeps));
+  app.get('/api/legal', (_req, res) => {
+    res.json(legalInfo());
+  });
   app.get('/api/health', (_req, res) => {
     res.json({ ok: true });
   });
@@ -78,6 +82,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log(`Veridium pipeline on http://${config.host}:${config.port}${config.sitePassword ? ' (password protected)' : ''}`);
     console.log(`Home: http://localhost:${config.port}/`);
     console.log(`Profile page: http://localhost:${config.port}/player.html?riotId=WompCat%23NA1&region=na1`);
-    console.log(`Org dashboard: http://localhost:${config.port}/org.html?id=obscurity-esports`);
+    console.log(`Organizations: http://localhost:${config.port}/organizations.html`);
   });
 }

@@ -35,8 +35,6 @@
   .settings-rows dd { margin: 0; overflow-wrap: anywhere; }
   @media (max-width: 960px) { .split { grid-template-columns: minmax(0, 1fr); } }
   .split.solo { grid-template-columns: minmax(0, 1fr); }
-  .claim { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; border: 1px dashed #c7cbff; background: var(--accent-soft); }
-  .claim p { margin: 0; flex: 1 1 280px; }
   /* Management controls are for the org's admins; visitors see the public page. */
   body:not(.org-admin) [data-admin] { display: none !important; }
   body:not(.org-admin) .stats.four { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -72,7 +70,6 @@
     </div>
   </section>
 
-  <section class="card pad claim" id="claim" hidden></section>
 
   <!-- Overview -->
   <div class="stack" id="view-overview" role="tabpanel" data-view="overview" hidden>
@@ -162,7 +159,8 @@
 <script src="shell.js"></script>
 <script src="common.js"></script>
 <script>
-  const orgId = new URLSearchParams(location.search).get('id') || 'obscurity-esports';
+  const orgId = new URLSearchParams(location.search).get('id');
+  if (!orgId) location.replace('organizations.html');
   const base = `/api/organizations/${encodeURIComponent(orgId)}`;
   const openApplicants = new Set(); // vacancy ids whose applicant list is expanded
   let acceptingId = null; // application id showing the accept options row
@@ -360,27 +358,14 @@
     $('settings').innerHTML = rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
   }
 
-  // What this visitor may do: admins manage; an org with no admin yet can be claimed.
+  // What this visitor may do: the org's admins manage it; everyone else sees the public page.
   function applyViewer() {
-    const { isAdmin: admin, canClaim, loggedIn } = org.viewer;
+    const admin = org.viewer.isAdmin;
     document.body.classList.toggle('org-admin', admin);
     $('orgMeta').textContent = admin ? 'Organization · You manage this org' : 'Organization';
     $('oOpenLink').textContent = admin ? 'Manage vacancies' : 'View vacancies';
     $('activityNote').textContent = admin ? 'Roster changes, postings and accepted players, newest first.' : 'Roster changes and postings, newest first.';
     $('view-vacancies').classList.toggle('solo', !admin);
-    $('claim').hidden = !canClaim;
-    $('claim').innerHTML = !canClaim ? '' : loggedIn
-      ? `<p><b>No one manages ${esc(org.name)} on Veridium yet.</b> If it's your organization, claim it to manage the roster, post vacancies and review applicants.</p>
-         <button class="btn primary" id="claimBtn">Claim this organization</button>`
-      : `<p><b>Is this your organization?</b> Log in to claim it and manage its roster, vacancies and applicants.</p>
-         <a class="btn primary" href="${esc(Veridium.loginHref())}">Log in to claim</a>`;
-    $('claimBtn')?.addEventListener('click', () => act(async () => {
-      if (!confirm(`Claim ${org.name}? You'll become its admin.`)) return;
-      await api(`${base}/claim`, { method: 'POST', body: {} });
-      org = await api(base);
-      applyViewer();
-      Veridium.refreshAccount({ reloadOnChange: false }); // adds the org to the account menu
-    }));
     showTab();
   }
 
@@ -501,7 +486,7 @@
       await refresh();
     } catch (err) {
       $('orgName').textContent = 'Organization not found';
-      notice(`${err.message}. Run "npm run seed" to create Obscurity Esports.`);
+      notice(`${err.message}. It may have been deleted.`);
       $('roster').innerHTML = '<tr><td colspan="7" class="empty">—</td></tr>';
       $('vacancies').innerHTML = '';
     }
