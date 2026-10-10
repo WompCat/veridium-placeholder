@@ -241,8 +241,16 @@
   </div>
 
   <aside class="stack">
-    <section class="card pad">
-      <h2>Season Stats</h2>
+    <section class="card pad" id="lolSeason" hidden>
+      <h2>LoL Season Stats</h2>
+      <div class="sub" id="lolSeasonNote">League of Legends, this season by queue</div>
+      <div class="table-wrap" style="margin-top:8px"><table class="mini-table">
+        <thead><tr><th>Queue</th><th>Games</th><th>Win %</th></tr></thead>
+        <tbody id="lolQueues"></tbody>
+      </table></div>
+    </section>
+    <section class="card pad" id="tftSeason">
+      <h2>TFT Season Stats</h2>
       <div class="sub">Teamfight Tactics, by set</div>
       <div class="table-wrap" style="margin-top:8px"><table class="mini-table">
         <thead><tr><th>Set</th><th>Matches</th><th>Top-4</th><th>Avg</th></tr></thead>
@@ -486,6 +494,7 @@
       tile('Top Champion', esc(l.champions[0]?.champion ?? '–'), l.champions[0] ? `${l.champions[0].games} games` : ''),
     ].join('');
     renderPrimary();
+    renderLolSeason();
   }
 
   function selectGame(game) {
@@ -612,6 +621,35 @@
       ['Applications', '<a href="#applications">See this player\'s applications</a>'],
     ];
     $('aboutRows').innerHTML = rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
+  }
+
+  // LoL sidebar: this season split by ranked queue. Riot's match history doesn't reach past seasons, so it's one season.
+  function renderLolSeason() {
+    const l = view.lol;
+    const card = $('lolSeason');
+    card.hidden = !l || !(l.games || l.ranks.solo || l.ranks.flex || l.otherRanks?.length);
+    if (card.hidden) return;
+    const short = (r) => (r ? `${esc(fmtRank(`${r.tier} ${r.division}`))} · ${r.leaguePoints} LP` : 'Unranked');
+    const queues = [
+      { name: 'Solo/Duo', ids: [420], rank: l.ranks.solo },
+      { name: 'Flex', ids: [440], rank: l.ranks.flex },
+      { name: 'Premade 5v5', ids: [710], rank: (l.otherRanks || []).find((r) => r.queue === 'RANKED_PREMADE_5x5') },
+    ];
+    const known = queues.flatMap((q) => q.ids);
+    queues.push({ name: 'Other ranked', ids: null, rank: null });
+    const played = l.matches.filter((m) => !m.remake);
+    const rows = queues.map((q) => {
+      const ms = played.filter((m) => (q.ids ? q.ids.includes(m.queueId) : !known.includes(m.queueId)));
+      return { ...q, games: ms.length, wins: ms.filter((m) => m.win).length };
+    }).filter((q) => q.games || q.rank);
+    $('lolSeasonNote').textContent = `Season ${l.season}, by queue` + (l.history.syncing ? ' · still loading' : '');
+    $('lolQueues').innerHTML = rows.map((q) => `<tr><td><b>${q.name}</b>${q.ids ? `<div class="sub">${short(q.rank)}</div>` : ''}</td><td>${q.games}</td>
+      <td>${q.games ? pct(q.wins / q.games) : '–'}</td></tr>`).join('')
+      + (rows.length > 1 ? `<tr><td><b>All ranked</b></td><td>${l.games}</td><td>${l.games ? pct(l.winRate) : '–'}</td></tr>` : '');
+    // Primary game's card on top; an empty TFT card is dropped for a LoL-only player.
+    const tftEmpty = !view.profile.rank && !(view.profile.seasons || []).some((x) => x.totalMatches);
+    $('tftSeason').hidden = tftEmpty;
+    if (primaryGame() === 'lol') $('tftSeason').before(card); else $('tftSeason').after(card);
   }
 
   function renderMiniSeasons() {
@@ -755,6 +793,7 @@
     renderStats();
     renderAbout();
     renderMiniSeasons();
+    renderLolSeason();
     renderMeButton();
     $('pickTft').textContent = p.rank ? fmtRank(`${p.rank.tier} ${p.rank.division}`) : 'Unranked';
   }
