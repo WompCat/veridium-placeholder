@@ -1,4 +1,6 @@
 /* Shared Veridium styles for every page. */
+  /* The hidden attribute always wins over component display rules (buttons, flex rows, cards). */
+  [hidden] { display: none !important; }
   :root {
     --bg: #f4f6fb;
     --card: #ffffff;
@@ -30,7 +32,7 @@
   /* ---- Site header (shell.js) ---- */
   .site-header { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 28px; padding: 0 28px; height: 64px; background: rgba(255,255,255,.96); backdrop-filter: blur(6px); border-bottom: 1px solid var(--border); }
   .site-header .logo { color: var(--text); flex: none; }
-  .site-search { flex: 1; max-width: 480px; display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); background: var(--bg); border-radius: 12px; padding: 0 14px; height: 40px; color: var(--muted); }
+  .site-search { flex: 1; min-width: 0; max-width: 480px; display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); background: var(--bg); border-radius: 12px; padding: 0 14px; height: 40px; color: var(--muted); }
   .site-search:focus-within { border-color: #c7cbff; box-shadow: 0 0 0 3px var(--accent-soft); }
   .site-search svg { width: 18px; height: 18px; flex: none; }
   .site-search input { flex: 1; min-width: 0; border: 0; background: none; font: inherit; color: var(--text); outline: none; }
@@ -42,16 +44,26 @@
   .me-chip { flex: none; display: flex; align-items: center; }
   .me-chip .mini-avatar { width: 36px; height: 36px; font-size: 15px; box-shadow: 0 0 0 2px #fff, 0 0 0 3px var(--accent-soft); }
   .header-ctas { display: flex; gap: 8px; flex: none; }
-  @media (max-width: 640px) { .header-ctas { margin-left: auto; } .header-ctas .btn:first-child { display: none; } }
-  .me-chip.setup { font-size: 13px; font-weight: 600; border: 1px solid var(--border); border-radius: 999px; padding: 7px 12px; }
-  @media (max-width: 1100px) { .site-nav span { display: none; } .site-nav a { padding: 0 10px; } }
+  @media (max-width: 640px) { .header-ctas { margin-left: auto; gap: 6px; } .header-ctas .btn { padding: 7px 12px; font-size: 13px; } }
+  .me-wrap { position: relative; flex: none; }
+  button.me-chip { border: 0; background: none; padding: 0; cursor: pointer; border-radius: 50%; }
+  button.me-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .me-menu { position: absolute; right: 0; top: calc(100% + 10px); z-index: 50; min-width: 230px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 12px 32px rgba(17, 20, 70, .14); padding: 6px; display: grid; }
+  .me-menu[hidden] { display: none; }
+  .me-menu .me-head { padding: 10px 12px 8px; border-bottom: 1px solid var(--border); margin-bottom: 4px; display: grid; gap: 2px; }
+  .me-menu .me-head span { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+  .me-menu a, .me-menu button { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 8px; color: var(--text); font: inherit; font-size: 14px; text-align: left; border: 0; background: none; cursor: pointer; }
+  .me-menu a:hover, .me-menu button:hover, .me-menu a:focus-visible, .me-menu button:focus-visible { background: var(--accent-soft); outline: none; }
+  .me-menu small { font-size: 10px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .04em; }
+  .me-menu #logoutBtn { color: var(--bad); border-top: 1px solid var(--border); border-radius: 0 0 8px 8px; margin-top: 4px; }
+  @media (max-width: 1100px) { .site-nav span { display: none; } .site-nav a { padding: 0 10px; } .site-header { gap: 16px; padding: 0 20px; } }
   @media (max-width: 640px) {
     .site-header { flex-wrap: wrap; height: auto; padding: 10px 16px 0; gap: 10px; }
     .site-search { order: 3; flex-basis: 100%; max-width: none; }
     .site-nav { order: 4; flex-basis: 100%; margin: 0; height: 52px; justify-content: space-between; }
     .site-nav a { flex: 1; justify-content: center; flex-direction: column; gap: 2px; padding: 0 4px; }
     .site-nav span { display: block; font-size: 10px; }
-    .me-chip { margin-left: auto; }
+    .me-chip, .me-wrap { margin-left: auto; }
   }
   .soon { text-align: center; padding: 48px 20px; }
   .soon .icon { font-size: 40px; }

@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { AuthRepo } from '../src/auth/repo';
 import { Store } from '../src/cache/store';
 import { OrgRepo } from '../src/orgs/repo';
 import { RiotClient } from '../src/riot/client';
@@ -15,6 +16,9 @@ const KAIRO = 'puuid-kairo';
 
 let store: Store;
 let app: ReturnType<typeof createApp>;
+let auth: AuthRepo;
+let adminCookie: string;
+const playerCookies = new Map<string, string>();
 
 /** Players as the pipeline leaves them: a players row plus cached matches. */
 function seedPlayers() {
@@ -30,10 +34,32 @@ beforeEach(() => {
   new OrgRepo(store.db).createOrganization('Obscurity Esports');
   // Org routes never call Riot; a client with no key would throw if they tried.
   app = createApp({ client: new RiotClient({ apiKey: '' }), store, seasons: 3 });
+  // The org's admin manages it; players apply from their own accounts.
+  auth = new AuthRepo(store.db);
+  const admin = auth.createUser('admin@obscurity.gg', 'unused-hash', null);
+  auth.addOrgAdmin(ORG, admin.id);
+  adminCookie = `veridium_session=${auth.createSession(admin.id).token}`;
+  playerCookies.clear();
 });
 afterEach(() => store.close());
 
-const api = () => request(app);
+/** Requests made with a session cookie. */
+const as = (cookie: string) => ({
+  get: (url: string) => request(app).get(url).set('Cookie', cookie),
+  post: (url: string) => request(app).post(url).set('Cookie', cookie),
+  patch: (url: string) => request(app).patch(url).set('Cookie', cookie),
+  delete: (url: string) => request(app).delete(url).set('Cookie', cookie),
+});
+const api = () => as(adminCookie);
+
+/** A logged-in account linked to this player (created on first use). */
+function playerCookie(puuid: string): string {
+  if (!playerCookies.has(puuid)) {
+    const user = auth.createUser(`${puuid}@players.test`, 'unused-hash', puuid);
+    playerCookies.set(puuid, `veridium_session=${auth.createSession(user.id).token}`);
+  }
+  return playerCookies.get(puuid)!;
+}
 
 async function postVacancy(fields: Record<string, string> = {}) {
   const res = await api()
@@ -44,7 +70,7 @@ async function postVacancy(fields: Record<string, string> = {}) {
 }
 
 async function apply(vacancyId: string, playerPuuid = PUUID) {
-  return api().post(`/api/vacancies/${vacancyId}/applications`).send({ playerPuuid });
+  return as(playerCookie(playerPuuid)).post(`/api/vacancies/${vacancyId}/applications`).send({});
 }
 
 const roster = async () => (await api().get(`/api/organizations/${ORG}/roster`)).body as Array<Record<string, any>>;
@@ -61,6 +87,7 @@ describe('migrations', () => {
       { version: '003_vacancy_roles.sql' },
       { version: '004_lol.sql' },
       { version: '005_lol_remakes.sql' },
+      { version: '006_accounts.sql' },
     ]);
     const tables = reopened.db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`).all();
     expect(tables.map((t: any) => t.name)).toEqual(
@@ -267,7 +294,7 @@ describe('applications: the player ↔ org loop', () => {
     await apply(coach.id);
     await api().patch(`/api/applications/${a1}`).send({ status: 'accepted' });
 
-    const mine = (await api().get('/api/players/na1/wompcat%23na1/applications')).body;
+    const mine = (await as(playerCookie(PUUID)).get('/api/players/na1/wompcat%23na1/applications')).body;
     expect(mine.map((a: any) => [a.vacancy.title, a.status, a.onRoster, a.organizationName])).toEqual([
       ['Coach', 'pending', true, 'Obscurity Esports'], // on the roster via the other application
       ['Flex Player', 'accepted', true, 'Obscurity Esports'],

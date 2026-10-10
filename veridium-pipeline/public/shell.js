@@ -1,8 +1,10 @@
-// Shared site header for every page: logo, search, icon nav, and "me".
-// A page sets <body data-page="home|players|organizations|tournaments|jobs"> and has <header id="site-header">.
-// "Me" is the Riot ID this browser has identified as (no accounts yet), stored locally only.
+// Shared site header for every page: logo, search, icon nav, and the account menu.
+// A page sets <body data-page="home|players|organizations|tournaments|jobs|landing|login"> and has <header id="site-header">.
+// The logged-in account comes from the session cookie (GET /api/auth/me). A copy is cached locally so
+// pages can render right away; if the server disagrees (logged out elsewhere, session expired) the page reloads.
 (() => {
-  const ME_KEY = 'veridium.lastRiotId';
+  const ACCOUNT_KEY = 'veridium.account';
+  try { localStorage.removeItem('veridium.lastRiotId'); } catch {} // the pre-accounts "me" key
   const ICONS = {
     home: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
     players: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/>',
@@ -22,30 +24,90 @@
     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
   const escape = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-  function getMe() {
+  /** The logged-in account ({ email, player, adminOf }) or null. */
+  function getAccount() {
     try {
-      const me = JSON.parse(localStorage.getItem(ME_KEY));
-      return me && me.riotId && me.region ? me : null;
+      const a = JSON.parse(localStorage.getItem(ACCOUNT_KEY));
+      return a && a.email ? a : null;
     } catch {
       return null;
     }
   }
-  function setMe(riotId, region) {
-    try { localStorage.setItem(ME_KEY, JSON.stringify({ riotId, region })); } catch {}
+  /** The logged-in account's linked Riot ID ({ riotId, region }), or null. */
+  function getMe() {
+    const p = getAccount()?.player;
+    return p ? { riotId: p.riotId, region: p.region } : null;
+  }
+  function cacheAccount(user) {
+    try {
+      if (user) localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ email: user.email, player: user.player, adminOf: user.adminOf }));
+      else localStorage.removeItem(ACCOUNT_KEY);
+    } catch {}
+  }
+
+  /** Re-read the session from the server. Reloads the page if who's logged in changed. */
+  async function refreshAccount({ reloadOnChange = true } = {}) {
+    const before = JSON.stringify(getAccount());
+    let user;
+    try {
+      const res = await fetch('/api/auth/me');
+      if (!res.ok) return getAccount();
+      user = (await res.json()).user;
+    } catch {
+      return getAccount(); // offline: keep the cached view
+    }
+    cacheAccount(user);
+    const changed = before !== JSON.stringify(getAccount());
+    if (changed && reloadOnChange && document.body.dataset.page !== 'login') location.reload();
+    else render();
+    return getAccount();
+  }
+
+  /** Call after logging in, signing up or linking a Riot ID: caches the account the server returned. */
+  function signedIn(user) {
+    cacheAccount(user);
     render();
   }
-  function clearMe() {
-    try { localStorage.removeItem(ME_KEY); } catch {}
-    render();
+
+  async function logout() {
+    try { await fetch('/api/auth/logout', { method: 'POST' }); } catch {}
+    cacheAccount(null);
+    location.href = 'welcome.html';
   }
+
+  /** The login page (or sign-up, with optional prefill), returning here afterwards. */
+  function loginHref(mode = 'login', params = {}) {
+    const q = new URLSearchParams({ ...(mode === 'signup' && { mode }), ...params, next: location.pathname + location.search + location.hash });
+    return `login.html?${q}`;
+  }
+
   const playerHref = (riotId, region) =>
     `player.html?riotId=${encodeURIComponent(riotId)}&region=${encodeURIComponent(region)}`;
 
+  function accountMenu(account) {
+    const me = getMe();
+    const label = me ? me.riotId : account.email;
+    const orgs = account.adminOf || [];
+    return `<div class="me-wrap">
+      <button class="me-chip" id="meBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="meMenu" title="Account: ${escape(label)}">
+        <span class="mini-avatar">${escape(label.charAt(0).toUpperCase())}</span></button>
+      <div class="me-menu" id="meMenu" role="menu" hidden>
+        <div class="me-head"><b>${escape(me ? me.riotId.split('#')[0] : 'Your account')}</b><span>${escape(account.email)}</span></div>
+        ${me ? `<a role="menuitem" href="${playerHref(me.riotId, me.region)}">My profile</a>`
+          : '<a role="menuitem" href="login.html#link">Link your Riot ID</a>'}
+        ${orgs.map((o) => `<a role="menuitem" href="org.html?id=${encodeURIComponent(o.id)}">${escape(o.name)} <small>Admin</small></a>`).join('')}
+        <a role="menuitem" href="login.html">Account settings</a>
+        <button role="menuitem" type="button" id="logoutBtn">Log out</button>
+      </div>
+    </div>`;
+  }
+
+  let closeMenu = () => {};
   function render() {
     const el = document.getElementById('site-header');
     if (!el) return;
     const page = document.body.dataset.page;
-    const me = getMe();
+    const account = getAccount();
     const q = new URLSearchParams(location.search).get('q') ?? '';
     el.className = 'site-header';
     el.innerHTML = `
@@ -60,20 +122,37 @@
       <nav class="site-nav" aria-label="Main">
         ${NAV.map(([key, label, href]) => `<a href="${href}" title="${label}" class="${key === page ? 'active' : ''}" ${key === page ? 'aria-current="page"' : ''}>${icon(key)}<span>${label}</span></a>`).join('')}
       </nav>
-      ${me
-        ? `<a class="me-chip" href="${playerHref(me.riotId, me.region)}" title="My profile: ${escape(me.riotId)}"><span class="mini-avatar">${escape(me.riotId.charAt(0).toUpperCase())}</span></a>`
-        : page === 'landing'
-          ? `<div class="header-ctas"><a class="btn" href="organizations.html">Looking to hire?</a><a class="btn primary" href="#create">Create profile</a></div>`
-          : `<a class="me-chip setup" href="/#me">Set up profile</a>`}`;
+      ${account
+        ? accountMenu(account)
+        : page === 'login'
+          ? ''
+          : `<div class="header-ctas"><a class="btn" href="${escape(loginHref())}">Log in</a><a class="btn primary" href="${escape(loginHref('signup'))}">Sign up</a></div>`}`;
     document.getElementById('siteSearch').addEventListener('submit', (e) => {
       e.preventDefault();
       const term = e.target.q.value.trim();
       if (!term) return;
       location.href = term.includes('#') ? playerHref(term, getMe()?.region ?? 'na1') : `players.html?q=${encodeURIComponent(term)}`;
     });
+    const btn = document.getElementById('meBtn');
+    if (btn) {
+      const menu = document.getElementById('meMenu');
+      closeMenu = () => { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        menu.hidden = !menu.hidden;
+        btn.setAttribute('aria-expanded', String(!menu.hidden));
+        if (!menu.hidden) menu.querySelector('a, button')?.focus();
+      });
+      document.getElementById('logoutBtn').addEventListener('click', logout);
+    }
   }
+  // Registered once: clicking elsewhere or Escape closes the account menu.
+  document.addEventListener('click', (e) => { if (!e.target.closest?.('.me-wrap')) closeMenu(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
 
-  window.Veridium = { getMe, setMe, clearMe, playerHref };
+  // `ready` resolves to the server's view of the account; pages that gate on login await it.
+  window.Veridium = { getAccount, getMe, refreshAccount, signedIn, logout, loginHref, playerHref };
+  window.Veridium.ready = refreshAccount();
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render);
   else render();
 })();

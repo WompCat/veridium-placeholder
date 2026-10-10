@@ -130,11 +130,26 @@ searches the directory.
 | `/organizations.html` | directory of organizations |
 | `/org.html?id=…` | Org Dashboard: Overview, Roster, Scrims, Vacancies, Settings |
 | `/tournaments.html` | coming-soon placeholder |
-| `/jobs.html` | open vacancies; apply with a Riot ID |
+| `/jobs.html` | open vacancies; apply as your own Riot ID |
+| `/login.html` | log in / sign up; when logged in, account settings (link a Riot ID, log out) |
 
-**"Me" without accounts.** The Riot ID you set on Home, or with "This is me" on a profile, is
-remembered in this browser (localStorage). It drives the Home profile card and the header avatar.
-It's a convenience, not a login: anyone can still view and apply as any Riot ID.
+**Accounts.** Sign up with an email and password, plus your Riot ID (optional for recruiters; it can
+be linked later). The Riot ID is looked up with Riot and one Riot ID belongs to one account at most.
+Sessions are a random token in an HttpOnly, SameSite=Lax cookie (30 days); the database stores only
+its SHA-256, and passwords only as scrypt hashes. Failed logins are throttled per email.
+
+| Who | Can |
+|---|---|
+| Anyone | browse players, profiles, orgs, rosters and open vacancies |
+| A logged-in player (Riot ID linked) | apply to vacancies as themselves; see their own applications and results |
+| An org admin | manage the roster, post/close vacancies, see applicants and accept/reject |
+
+An org with no admin yet (like the seeded Obscurity Esports) shows **Claim this organization** to
+logged-in users; the first to claim it becomes its admin.
+
+Not verified yet: that the person linking a Riot ID owns it. Riot only offers that through Riot Sign
+On (RSO), which needs an approved production key; until then, uniqueness stops two accounts from
+claiming one player, and the site password keeps a deployment private.
 
 **Nothing on the home screen is invented.** The feed is built from real events (`GET /api/feed`):
 each player's TFT and League of Legends games grouped by day, roster signings, and vacancy postings. Posting, likes,
@@ -158,7 +173,12 @@ their profile.
 | Endpoint | |
 | --- | --- |
 | `GET /api/organizations` | every org with roster size and open vacancies |
-| `GET /api/organizations/:id` | org name and roster size |
+| `POST /api/auth/signup` | `{ email, password, riotId?, region? }`: creates the account and logs in |
+| `POST /api/auth/login` · `POST /api/auth/logout` | `{ email, password }` · ends the session |
+| `GET /api/auth/me` | `{ user: { email, player, adminOf } \| null }` |
+| `PUT /api/auth/me/player` | `{ riotId, region }` links a Riot ID; `{ riotId: null }` unlinks |
+| `GET /api/organizations/:id` | org name, roster size, and `viewer: { loggedIn, isAdmin, canClaim }` |
+| `POST /api/organizations/:id/claim` | logged in: become the admin of an org that has none |
 | `GET /api/organizations/:id/roster` | active then bench members, each with `player` stats |
 | `POST /api/organizations/:id/roster` | `{ playerPuuid \| riotId+region, role, status? }` |
 | `PATCH /api/organizations/:id/roster/:playerPuuid` | `{ role?, status? }` (`active` / `bench`) |
@@ -167,11 +187,11 @@ their profile.
 | `POST /api/organizations/:id/vacancies` | `{ title, role?, game? = TFT, region? = NA, level? = competitive }` |
 | `PATCH /api/vacancies/:id` | `{ status: open \| closed }` (title/role/game/region/level also editable) |
 | `GET /api/vacancies?game=&region=&role=&status=` | public listing, newest first; `status` defaults to `open`, or `closed` / `all` |
-| `POST /api/vacancies/:id/applications` | `{ playerPuuid \| riotId+region }` |
-| `GET /api/vacancies/:id/applications` | pending first, each with `player` stats and `onRoster` |
+| `POST /api/vacancies/:id/applications` | logged in with a linked Riot ID: applies as that player |
+| `GET /api/vacancies/:id/applications` | org admins: pending first, each with `player` stats and `onRoster` |
 | `PATCH /api/applications/:id` | `{ status: accepted \| rejected, addToRoster? = true, role?, rosterStatus? }` |
 | `POST /api/applications/:id/roster` | add an accepted applicant: `{ role? = vacancy role or title, status? = active }` |
-| `GET /api/players/:region/:riotId/applications` | a player's own applications with vacancy, org and status |
+| `GET /api/players/:region/:riotId/applications` | that player only: their applications with vacancy, org and status |
 | `GET /api/players` | every loaded player with verified stats, highest rank first |
 | `GET /api/players/:region/:riotId/lol` | League of Legends ranked profile for the current season (`?cached=1` for cache only) |
 | `GET /api/feed?limit=` | home feed: TFT and League of Legends sessions (one per player per game per day; LoL remakes left out), roster joins, vacancies |
@@ -195,8 +215,9 @@ unchanged. To change the schema, add the next numbered file. Never edit one that
 
 ### Open decisions
 
-- **Who can post vacancies / manage the roster.** There are no accounts yet, so every org endpoint
-  is open to anyone who can reach the server. Add auth before this is exposed beyond local use.
+- **Riot ID ownership.** Linking a Riot ID isn't proven yet (needs Riot Sign On). See Accounts above.
+- **Creating orgs.** Orgs come from the seed and are claimed by their first admin; there's no
+  "create an organization" flow or way to add more admins yet.
 - **Free vs paid vacancy postings.** There's no `plan` / `billingStatus` on `Organization` yet. Add
   it in a new migration once that's decided.
 - **Obscurity Esports** is created by `npm run seed`, not by a migration, so it's easy to change or drop.
@@ -229,7 +250,7 @@ between requests. The repo is set up for [Render](https://render.com):
 | `RIOT_API_KEY` | set in Render's dashboard; never committed (`.env` is gitignored) |
 | `DB_PATH` | `/var/data/veridium.db`, which must sit on the disk mount or data is lost on redeploy |
 | `SEASONS` | `3` |
-| `SITE_PASSWORD` | puts the whole site behind a browser password prompt. There are no accounts yet, so without it anyone with the URL can edit rosters and use up the Riot key's rate limit |
+| `SITE_PASSWORD` | puts the whole site behind a browser password prompt. Recommended while Riot ID ownership isn't verified and orgs can be claimed by the first person to log in |
 | `PORT` | injected by Render; the app reads `process.env.PORT` (4000 is only the local default) |
 | `HOST` | `0.0.0.0` by default, so Render can route traffic in |
 

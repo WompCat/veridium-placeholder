@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Log in · Veridium</title>
+<link rel="icon" href="data:," />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="app.css" />
+<style>
+  main.auth { display: block; max-width: 1000px; padding-top: 40px; padding-bottom: 60px; }
+  .auth-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 440px); gap: 48px; align-items: center; }
+  .pitch h1 { font-size: 36px; line-height: 1.1; letter-spacing: -.02em; margin: 0 0 14px; }
+  .pitch p { color: var(--muted); font-size: 15px; line-height: 1.6; margin: 0 0 20px; max-width: 420px; }
+  .pitch ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+  .pitch li { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
+  .pitch li .tick { flex: none; width: 22px; height: 22px; border-radius: 50%; background: #e7f7ee; color: var(--good); display: grid; place-items: center; font-size: 12px; font-weight: 700; }
+  .auth-card { padding: 28px; }
+  .switch { display: grid; grid-template-columns: 1fr 1fr; background: var(--bg); border-radius: 12px; padding: 4px; margin-bottom: 22px; }
+  .switch button { border: 0; background: none; font: inherit; font-weight: 600; font-size: 14px; color: var(--muted); padding: 9px; border-radius: 9px; cursor: pointer; }
+  .switch button[aria-selected="true"] { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(17, 20, 70, .12); }
+  .auth-card h2 { font-size: 20px; margin: 0 0 4px; }
+  .auth-card .sub { margin-bottom: 18px; }
+  form.stack-form { display: grid; gap: 14px; }
+  .stack-form .field input, .stack-form .field select { padding: 11px 12px; font-size: 14px; }
+  .pw { position: relative; display: grid; }
+  .pw input { padding-right: 64px !important; }
+  .pw button { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: none; color: var(--accent); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; padding: 6px 8px; border-radius: 6px; }
+  .riot-row { display: grid; grid-template-columns: minmax(0, 1fr) 96px; gap: 10px; }
+  .hint { font-size: 12px; color: var(--muted); font-weight: 400; }
+  .optional { font-weight: 400; color: var(--muted); }
+  .stack-form .btn.primary { padding: 12px; font-size: 15px; border-radius: 11px; }
+  .fine { font-size: 12px; color: var(--muted); text-align: center; margin-top: 16px; line-height: 1.5; }
+  .form-msg.error { color: var(--bad); }
+  .form-msg.ok { color: var(--good); }
+  .account-rows { display: grid; margin: 4px 0 18px; }
+  .account-rows > div { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .account-rows > div:last-child { border-bottom: 0; }
+  .account-rows dt { color: var(--muted); font-size: 13px; }
+  .account-rows dd { margin: 0; font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+  .linkbox { border: 1px dashed #c7cbff; background: var(--accent-soft); border-radius: 12px; padding: 16px; margin-bottom: 18px; }
+  .linkbox h3 { margin: 0 0 4px; font-size: 15px; }
+  @media (max-width: 860px) { .auth-grid { grid-template-columns: minmax(0, 1fr); gap: 24px; } .pitch { order: 2; } main.auth { padding-top: 20px; } .pitch h1 { font-size: 26px; } }
+</style>
+</head>
+<body data-page="login">
+<header id="site-header"></header>
+
+<main class="auth">
+  <div class="auth-grid">
+    <section class="pitch">
+      <h1>Your verified esports career, in one place.</h1>
+      <p>Veridium builds your profile from official Riot data, so organizations see real ranks and real match history.</p>
+      <ul>
+        <li><span class="tick">✓</span><span><b>Stats nobody can fake.</b> Ranks and matches come straight from Riot's API.</span></li>
+        <li><span class="tick">✓</span><span><b>Apply in one click.</b> Your verified profile is your resume.</span></li>
+        <li><span class="tick">✓</span><span><b>Private where it matters.</b> Only you and the org see your application results.</span></li>
+      </ul>
+    </section>
+
+    <section class="card auth-card" id="authCard">
+      <!-- Logged out: log in / sign up -->
+      <div id="authForms">
+        <div class="switch" role="tablist" aria-label="Log in or sign up">
+          <button role="tab" id="tabLogin" aria-controls="loginForm" aria-selected="true">Log in</button>
+          <button role="tab" id="tabSignup" aria-controls="signupForm" aria-selected="false">Sign up</button>
+        </div>
+
+        <form class="stack-form" id="loginForm" novalidate>
+          <div><h2>Welcome back</h2><div class="sub">Log in to apply to teams and manage your organization.</div></div>
+          <label class="field">Email<input name="email" type="email" autocomplete="email" required /></label>
+          <label class="field">Password
+            <span class="pw"><input name="password" type="password" autocomplete="current-password" required /><button type="button" data-show>Show</button></span>
+          </label>
+          <button class="btn primary">Log in</button>
+          <div class="form-msg" id="loginMsg" role="alert"></div>
+        </form>
+
+        <form class="stack-form" id="signupForm" hidden novalidate>
+          <div><h2>Create your account</h2><div class="sub">Free. Takes a minute.</div></div>
+          <label class="field">Email<input name="email" type="email" autocomplete="email" required /></label>
+          <label class="field">Password
+            <span class="pw"><input name="password" type="password" autocomplete="new-password" minlength="8" required aria-describedby="pwHint" /><button type="button" data-show>Show</button></span>
+            <span class="hint" id="pwHint">At least 8 characters.</span>
+          </label>
+          <div class="field">
+            <span>Riot ID <span class="optional">· optional for recruiters</span></span>
+            <div class="riot-row">
+              <input name="riotId" placeholder="Name#TAG" autocomplete="off" aria-label="Riot ID" />
+              <select name="region" aria-label="Region"></select>
+            </div>
+            <span class="hint">We look it up with Riot and load your verified match history.</span>
+          </div>
+          <button class="btn primary">Create account</button>
+          <div class="form-msg" id="signupMsg" role="alert"></div>
+        </form>
+        <div class="fine">Veridium isn't endorsed by Riot Games. Your password is stored only as a secure hash.</div>
+      </div>
+
+      <!-- Logged in: account settings -->
+      <div id="accountView" hidden>
+        <h2>Your account</h2>
+        <div class="sub" id="accountSub"></div>
+        <div class="linkbox" id="link" hidden>
+          <h3>Link your Riot ID</h3>
+          <div class="sub" style="margin-bottom:12px">Needed to apply to teams. We'll load your verified match history from Riot.</div>
+          <form class="stack-form" id="linkForm">
+            <div class="riot-row">
+              <input name="riotId" placeholder="Name#TAG" required aria-label="Riot ID" style="border:1px solid var(--border);border-radius:9px;padding:10px 12px;font:inherit" />
+              <select name="region" aria-label="Region" style="border:1px solid var(--border);border-radius:9px;padding:0 8px;font:inherit"></select>
+            </div>
+            <button class="btn primary">Link Riot ID</button>
+            <div class="form-msg" id="linkMsg" role="alert"></div>
+          </form>
+        </div>
+        <dl class="account-rows" id="accountRows"></dl>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <a class="btn primary" id="continueBtn" href="/">Continue</a>
+          <button class="btn" id="logoutBtn2" type="button">Log out</button>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script src="shell.js"></script>
+<script src="common.js"></script>
+<script>
+  const params = new URLSearchParams(location.search);
+  // Only same-site paths: never bounce to another origin after logging in.
+  const nextUrl = (() => {
+    const n = params.get('next');
+    // The landing page isn't worth returning to: new accounts go to their profile instead.
+    return n && n.startsWith('/') && !n.startsWith('//') && !/^\/(login|welcome)\.html/.test(n) ? n : null;
+  })();
+
+  for (const sel of document.querySelectorAll('select[name=region]')) sel.innerHTML = regionOptions(params.get('region') || 'na1');
+  if (params.get('riotId')) $('signupForm').riotId.value = params.get('riotId');
+
+  function setMode(mode) {
+    const signup = mode === 'signup';
+    $('loginForm').hidden = signup;
+    $('signupForm').hidden = !signup;
+    $('tabLogin').setAttribute('aria-selected', String(!signup));
+    $('tabSignup').setAttribute('aria-selected', String(signup));
+    document.title = `${signup ? 'Sign up' : 'Log in'} · Veridium`;
+    const url = new URL(location.href);
+    signup ? url.searchParams.set('mode', 'signup') : url.searchParams.delete('mode');
+    history.replaceState(null, '', url);
+  }
+  $('tabLogin').addEventListener('click', () => { setMode('login'); $('loginForm').email.focus(); });
+  $('tabSignup').addEventListener('click', () => { setMode('signup'); $('signupForm').email.focus(); });
+
+  // A message about the last attempt goes away once the user starts fixing it.
+  for (const [form, msg] of [['loginForm', 'loginMsg'], ['signupForm', 'signupMsg'], ['linkForm', 'linkMsg']]) {
+    $(form).addEventListener('input', () => { if ($(msg).classList.contains('error')) setMsg($(msg), ''); });
+  }
+
+  for (const b of document.querySelectorAll('[data-show]')) {
+    b.addEventListener('click', () => {
+      const input = b.previousElementSibling;
+      input.type = input.type === 'password' ? 'text' : 'password';
+      b.textContent = input.type === 'password' ? 'Show' : 'Hide';
+    });
+  }
+
+  // Where to go once logged in: back where they came from, else their profile, else home.
+  function destination(user) {
+    if (nextUrl) return nextUrl;
+    return user.player ? Veridium.playerHref(user.player.riotId, user.player.region) : '/';
+  }
+
+  async function submit(form, msgEl, path, payload, busyText) {
+    const btn = form.querySelector('button.primary');
+    btn.disabled = true;
+    setMsg(msgEl, busyText);
+    try {
+      const { user } = await api(path, { method: path.endsWith('/player') ? 'PUT' : 'POST', body: payload });
+      Veridium.signedIn(user);
+      return user;
+    } catch (err) {
+      setMsg(msgEl, err.message, 'error');
+      btn.disabled = false;
+      return null;
+    }
+  }
+
+  $('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target));
+    if (!f.email || !f.password) return setMsg($('loginMsg'), 'Enter your email and password.', 'error');
+    const user = await submit(e.target, $('loginMsg'), '/api/auth/login', f, 'Logging in…');
+    if (user) location.href = destination(user);
+  });
+
+  $('signupForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target));
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email)) return setMsg($('signupMsg'), 'Enter a valid email address.', 'error');
+    if (f.password.length < 8) return setMsg($('signupMsg'), 'Use a password of at least 8 characters.', 'error');
+    if (f.riotId && !f.riotId.includes('#')) return setMsg($('signupMsg'), 'Riot IDs look like Name#TAG.', 'error');
+    const payload = { email: f.email, password: f.password, ...(f.riotId.trim() && { riotId: f.riotId.trim(), region: f.region }) };
+    const user = await submit(e.target, $('signupMsg'), '/api/auth/signup', payload,
+      payload.riotId ? 'Creating your account and loading your match history from Riot…' : 'Creating your account…');
+    if (user) location.href = destination(user);
+  });
+
+  $('linkForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target));
+    const user = await submit(e.target, $('linkMsg'), '/api/auth/me/player', { riotId: f.riotId.trim(), region: f.region }, 'Loading your match history from Riot…');
+    if (user) location.href = destination(user);
+  });
+
+  function renderAccount(account) {
+    $('authForms').hidden = true;
+    $('accountView').hidden = false;
+    document.title = 'Account · Veridium';
+    const me = account.player;
+    $('accountSub').textContent = me ? `Logged in as ${me.riotId}.` : 'Logged in. Link your Riot ID to apply to teams.';
+    $('link').hidden = !!me;
+    const rows = [
+      ['Email', esc(account.email)],
+      ['Riot ID', me ? `<a href="${esc(Veridium.playerHref(me.riotId, me.region))}">${esc(me.riotId)}</a> · ${esc(me.region.toUpperCase())}` : '<span class="dim">Not linked</span>'],
+      ['Organizations', account.adminOf?.length
+        ? account.adminOf.map((o) => `<a href="org.html?id=${encodeURIComponent(o.id)}">${esc(o.name)}</a>`).join(', ')
+        : '<span class="dim">None yet</span>'],
+    ];
+    $('accountRows').innerHTML = rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
+    $('continueBtn').href = destination(account);
+    $('continueBtn').textContent = nextUrl ? 'Continue' : me ? 'Go to my profile' : 'Go to home';
+    if (location.hash === '#link' && !me) $('linkForm').riotId.focus();
+  }
+  $('logoutBtn2').addEventListener('click', () => Veridium.logout());
+
+  setMode(params.get('mode') === 'signup' ? 'signup' : 'login');
+  const cached = Veridium.getAccount();
+  if (cached) renderAccount(cached);
+  Veridium.ready.then((account) => {
+    if (account) renderAccount(account);
+    else { $('authForms').hidden = false; $('accountView').hidden = true; }
+  });
+</script>
+</body>
+</html>

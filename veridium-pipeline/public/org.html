@@ -34,6 +34,13 @@
   .settings-rows dt { color: var(--muted); }
   .settings-rows dd { margin: 0; overflow-wrap: anywhere; }
   @media (max-width: 960px) { .split { grid-template-columns: minmax(0, 1fr); } }
+  .split.solo { grid-template-columns: minmax(0, 1fr); }
+  .claim { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; border: 1px dashed #c7cbff; background: var(--accent-soft); }
+  .claim p { margin: 0; flex: 1 1 280px; }
+  /* Management controls are for the org's admins; visitors see the public page. */
+  body:not(.org-admin) [data-admin] { display: none !important; }
+  body:not(.org-admin) .stats.four { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  @media (max-width: 640px) { body:not(.org-admin) .stats.four { grid-template-columns: 1fr 1fr; } }
   @media (max-width: 640px) { .stats.four { grid-template-columns: 1fr 1fr; } .settings-rows div { grid-template-columns: 1fr; gap: 2px; } }
 </style>
 </head>
@@ -48,7 +55,7 @@
       <div class="org-logo" id="orgLogo">?</div>
       <div class="who">
         <h1 id="orgName">Loading…</h1>
-        <div class="meta">Organization · Org Dashboard</div>
+        <div class="meta" id="orgMeta">Organization</div>
       </div>
       <div class="kpis">
         <div class="kpi"><b id="kActive">–</b><span>Active</span></div>
@@ -61,9 +68,11 @@
       <button role="tab" data-tab="roster" aria-controls="view-roster">Roster</button>
       <button role="tab" data-tab="scrims" aria-controls="view-scrims">Scrims</button>
       <button role="tab" data-tab="vacancies" aria-controls="view-vacancies">Vacancies</button>
-      <button role="tab" data-tab="settings" aria-controls="view-settings">Settings</button>
+      <button role="tab" data-tab="settings" aria-controls="view-settings" data-admin>Settings</button>
     </div>
   </section>
+
+  <section class="card pad claim" id="claim" hidden></section>
 
   <!-- Overview -->
   <div class="stack" id="view-overview" role="tabpanel" data-view="overview" hidden>
@@ -72,13 +81,13 @@
       <div class="stats four" style="margin-top:14px">
         <div class="stat"><div class="label">Active players</div><div class="value" id="oActive">–</div><div class="hint"><a href="#roster">View roster</a></div></div>
         <div class="stat"><div class="label">Bench</div><div class="value" id="oBench">–</div><div class="hint">Subs and reserves</div></div>
-        <div class="stat"><div class="label">Open roles</div><div class="value" id="oOpen">–</div><div class="hint"><a href="#vacancies">Manage vacancies</a></div></div>
-        <div class="stat"><div class="label">Pending applications</div><div class="value" id="oPending">–</div><div class="hint" id="oPendingHint">Waiting for review</div></div>
+        <div class="stat"><div class="label">Open roles</div><div class="value" id="oOpen">–</div><div class="hint"><a href="#vacancies" id="oOpenLink">View vacancies</a></div></div>
+        <div class="stat" data-admin><div class="label">Pending applications</div><div class="value" id="oPending">–</div><div class="hint" id="oPendingHint">Waiting for review</div></div>
       </div>
     </section>
     <section class="card pad">
       <h2>Recent activity</h2>
-      <div class="sub">Roster changes, postings and accepted players, newest first.</div>
+      <div class="sub" id="activityNote">Roster changes and postings, newest first.</div>
       <div class="activity" id="activity" style="margin-top:8px"><div class="empty">Loading…</div></div>
     </section>
   </div>
@@ -90,10 +99,11 @@
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Player</th><th>Rank</th><th>Win Rate</th><th>Role</th><th>Status</th><th>Joined</th><th></th></tr></thead>
+        <thead><tr><th>Player</th><th>Rank</th><th>Win Rate</th><th>Role</th><th>Status</th><th>Joined</th><th data-admin></th></tr></thead>
         <tbody id="roster"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
       </table>
     </div>
+    <div data-admin>
     <hr class="divider" />
     <h2 style="font-size:14px;margin-bottom:10px">Add a player</h2>
     <form class="form-row" id="addForm">
@@ -104,6 +114,7 @@
       <button class="btn primary">Add to roster</button>
     </form>
     <div class="form-msg" id="addMsg"></div>
+    </div>
   </section>
 
   <!-- Scrims: on hold this pass -->
@@ -123,7 +134,7 @@
       <button class="expand" id="showClosed" aria-expanded="false" hidden></button>
       <div class="list" id="closedVacancies" style="margin-top:12px" hidden></div>
     </section>
-    <section class="card pad">
+    <section class="card pad" data-admin>
       <h2>Post a vacancy</h2>
       <div class="sub" style="margin-bottom:14px">It appears on the Jobs page right away.</div>
       <form class="form-row" id="vacancyForm">
@@ -141,7 +152,7 @@
   <!-- Settings -->
   <section class="card pad" id="view-settings" role="tabpanel" data-view="settings" hidden>
     <h2>Organization settings</h2>
-    <div class="sub">Editing these comes with org accounts. Until then they're read-only.</div>
+    <div class="sub">Visible to this organization's admins. Editing the name and logo is coming soon.</div>
     <dl class="settings-rows" id="settings"></dl>
   </section>
 
@@ -162,8 +173,11 @@
   const TABS = ['overview', 'roster', 'scrims', 'vacancies', 'settings'];
 
   // Tabs: the hash (#roster) picks the view, so tabs are linkable and work with back/forward.
+  const isAdmin = () => !!org?.viewer?.isAdmin;
+
   function currentTab() {
     const tab = location.hash.slice(1);
+    if (tab === 'settings' && !isAdmin()) return 'overview';
     return TABS.includes(tab) ? tab : 'overview';
   }
 
@@ -217,7 +231,7 @@
         <td>${esc(m.role)}</td>
         <td><span class="status ${esc(m.status)}">${esc(m.status)}</span></td>
         <td>${esc(fmtDate(m.joinedAt))}</td>
-        <td style="text-align:right">
+        <td style="text-align:right" data-admin>
           <button class="btn small" data-act="toggle" data-puuid="${esc(m.playerPuuid)}">${m.status === 'active' ? 'Bench' : 'Activate'}</button>
           <button class="btn small bad" data-act="remove" data-puuid="${esc(m.playerPuuid)}">Remove</button>
         </td>
@@ -276,11 +290,11 @@
             <div class="sub">${esc(v.game)} · ${esc(v.region)} · ${esc(titleCase(v.level))} · posted ${esc(fmtDate(v.postedAt))}</div></div>
           <span class="status ${esc(v.status)}">${esc(v.status)}</span>
         </div>
-        <div class="item-actions">
+        ${isAdmin() ? `<div class="item-actions">
           <button class="btn small" data-act="applicants" data-vacancy="${esc(v.id)}">
             ${openApplicants.has(v.id) ? 'Hide' : 'View'} applicants (${v.applicationCount}${v.pendingCount ? `, ${v.pendingCount} pending` : ''})</button>
           <button class="btn small" data-act="${v.status === 'open' ? 'close' : 'open'}" data-vacancy="${esc(v.id)}">${v.status === 'open' ? 'Close' : 'Reopen'}</button>
-        </div>
+        </div>` : v.status === 'open' ? `<div class="item-actions"><a class="btn small primary" href="jobs.html#v-${esc(v.id)}">Apply on Jobs</a></div>` : ''}
         ${applicants ? `<div class="applicants">${applicantsTable(applicants, v)}</div>` : ''}
       </div>`;
   }
@@ -288,14 +302,14 @@
   async function loadVacancies() {
     vacancies = await api(`${base}/vacancies`); // newest first
     const applicants = Object.fromEntries(await Promise.all(vacancies
-      .filter((v) => openApplicants.has(v.id))
+      .filter((v) => isAdmin() && openApplicants.has(v.id))
       .map(async (v) => [v.id, await api(`/api/vacancies/${v.id}/applications`)])));
     const open = vacancies.filter((v) => v.status === 'open');
     const closed = vacancies.filter((v) => v.status === 'closed');
     $('kOpen').textContent = open.length;
     $('vacancies').innerHTML = open.length
       ? open.map((v) => vacancyCard(v, applicants[v.id])).join('')
-      : '<div class="empty">No open vacancies. Post one to start taking applications.</div>';
+      : `<div class="empty">${isAdmin() ? 'No open vacancies. Post one to start taking applications.' : 'No open roles right now.'}</div>`;
     $('showClosed').hidden = !closed.length;
     $('showClosed').setAttribute('aria-expanded', String(showClosed));
     $('showClosed').innerHTML = `${showClosed ? 'Hide' : 'Show'} closed vacancies (${closed.length}) <span class="chev">▾</span>`;
@@ -315,8 +329,9 @@
     $('oPending').textContent = pending;
     $('oPendingHint').innerHTML = pending ? '<a href="#vacancies">Review applicants</a>' : 'Nothing waiting';
 
-    const applications = (await Promise.all(vacancies.map(async (v) =>
-      (await api(`/api/vacancies/${v.id}/applications`)).map((a) => ({ ...a, vacancy: v }))))).flat();
+    // Applicants are private to admins, so only they see "accepted" lines.
+    const applications = isAdmin() ? (await Promise.all(vacancies.map(async (v) =>
+      (await api(`/api/vacancies/${v.id}/applications`)).map((a) => ({ ...a, vacancy: v }))))).flat() : [];
     const name = (p) => esc(p.riotId.split('#')[0]);
     const events = [
       ...roster.map((m) => ({ at: m.joinedAt, icon: '👤', text: `<b>${name(m.player)}</b> joined the roster as ${esc(m.role)}${m.status === 'bench' ? ' (bench)' : ''}` })),
@@ -331,7 +346,7 @@
     ].sort((x, y) => y.at.localeCompare(x.at)).slice(0, 8);
     $('activity').innerHTML = events.length
       ? events.map((e) => `<div><span class="dot" aria-hidden="true">${e.icon}</span><span>${e.text}</span><span class="when">${esc(fmtDate(e.at))}</span></div>`).join('')
-      : '<div class="empty">No activity yet. Add players or post a vacancy to get started.</div>';
+      : `<div class="empty">${isAdmin() ? 'No activity yet. Add players or post a vacancy to get started.' : 'No activity yet.'}</div>`;
   }
 
   function renderSettings() {
@@ -343,6 +358,30 @@
       ['Created', esc(fmtDate(org.createdAt))],
     ];
     $('settings').innerHTML = rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
+  }
+
+  // What this visitor may do: admins manage; an org with no admin yet can be claimed.
+  function applyViewer() {
+    const { isAdmin: admin, canClaim, loggedIn } = org.viewer;
+    document.body.classList.toggle('org-admin', admin);
+    $('orgMeta').textContent = admin ? 'Organization · You manage this org' : 'Organization';
+    $('oOpenLink').textContent = admin ? 'Manage vacancies' : 'View vacancies';
+    $('activityNote').textContent = admin ? 'Roster changes, postings and accepted players, newest first.' : 'Roster changes and postings, newest first.';
+    $('view-vacancies').classList.toggle('solo', !admin);
+    $('claim').hidden = !canClaim;
+    $('claim').innerHTML = !canClaim ? '' : loggedIn
+      ? `<p><b>No one manages ${esc(org.name)} on Veridium yet.</b> If it's your organization, claim it to manage the roster, post vacancies and review applicants.</p>
+         <button class="btn primary" id="claimBtn">Claim this organization</button>`
+      : `<p><b>Is this your organization?</b> Log in to claim it and manage its roster, vacancies and applicants.</p>
+         <a class="btn primary" href="${esc(Veridium.loginHref())}">Log in to claim</a>`;
+    $('claimBtn')?.addEventListener('click', () => act(async () => {
+      if (!confirm(`Claim ${org.name}? You'll become its admin.`)) return;
+      await api(`${base}/claim`, { method: 'POST', body: {} });
+      org = await api(base);
+      applyViewer();
+      Veridium.refreshAccount({ reloadOnChange: false }); // adds the org to the account menu
+    }));
+    showTab();
   }
 
   async function refresh() {
@@ -454,6 +493,7 @@
   (async () => {
     try {
       org = await api(base);
+      applyViewer();
       $('orgName').textContent = org.name;
       $('orgLogo').textContent = org.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
       document.title = `${org.name} · Veridium`;

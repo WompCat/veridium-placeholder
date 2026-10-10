@@ -151,8 +151,8 @@
 
 <script src="shell.js"></script>
 <script>
-  // First-time visitors (no profile set on this device) get the landing page; "/#me" opens setup here.
-  if (!Veridium.getMe() && location.hash !== '#me') location.replace('welcome.html');
+  // The home feed is for logged-in accounts; everyone else gets the landing page.
+  if (!Veridium.getAccount()) location.replace('welcome.html');
 </script>
 <script src="common.js"></script>
 <script>
@@ -177,12 +177,12 @@
       <div class="me-banner"></div>
       <div class="me-body">
         <span class="avatar">?</span>
-        <div class="me-name">Make Veridium yours</div>
-        <div class="sub" style="margin-top:4px">Enter your Riot ID to see your verified TFT stats here. No account needed, it's remembered on this device.</div>
+        <div class="me-name">Link your Riot ID</div>
+        <div class="sub" style="margin-top:4px">Add your Riot ID to your account to see your verified stats here and apply to teams.</div>
         <form class="form-row" id="meForm" style="margin-top:14px">
           <label class="field" style="flex-basis:100%">Riot ID<input name="riotId" placeholder="Name#TAG" required /></label>
           <label class="field">Region<select name="region">${regionOptions('na1')}</select></label>
-          <button class="btn primary">Continue</button>
+          <button class="btn primary">Link</button>
         </form>
         <div class="form-msg ${message ? 'error' : ''}" id="meMsg">${esc(message ?? '')}</div>
       </div>`;
@@ -191,8 +191,8 @@
       const f = Object.fromEntries(new FormData(e.target));
       setMsg($('meMsg'), 'Loading your verified profile from Riot…');
       try {
-        const p = await loadPlayer(f.riotId.trim(), f.region);
-        Veridium.setMe(p.riotId, p.region);
+        const { user } = await api('/api/auth/me/player', { method: 'PUT', body: { riotId: f.riotId.trim(), region: f.region } });
+        Veridium.signedIn(user);
         renderLeft();
       } catch (err) {
         setMsg($('meMsg'), err.message, 'error');
@@ -208,12 +208,11 @@
       ? [[Veridium.playerHref(me.riotId, me.region), '👤', 'View my profile'],
          [Veridium.playerHref(me.riotId, me.region) + '#applications', '📨', 'My applications'],
          ['jobs.html', '💼', 'Browse vacancies'],
-         ['#me', '🔁', 'Switch profile']]
-      : [['players.html', '🔎', 'Find players'], ['jobs.html', '💼', 'Browse vacancies'], ['organizations.html', '🏢', 'Organizations']];
-    $('quickLinks').innerHTML = links.map(([href, icon, label]) =>
-      `<a href="${href}" ${label === 'Switch profile' ? 'data-switch' : ''}><span aria-hidden="true">${icon}</span>${label}</a>`).join('');
-    const sw = document.querySelector('[data-switch]');
-    if (sw) sw.addEventListener('click', (e) => { e.preventDefault(); Veridium.clearMe(); renderSetup(); });
+         ['login.html', '⚙️', 'Account settings']]
+      : [['players.html', '🔎', 'Find players'], ['jobs.html', '💼', 'Browse vacancies'], ['login.html', '⚙️', 'Account settings']];
+    const orgs = (Veridium.getAccount()?.adminOf ?? []).map((o) => [`org.html?id=${encodeURIComponent(o.id)}`, '🏢', o.name]);
+    $('quickLinks').innerHTML = [...links.slice(0, -1), ...orgs, links.at(-1)].map(([href, icon, label]) =>
+      `<a href="${esc(href)}"><span aria-hidden="true">${icon}</span>${esc(label)}</a>`).join('');
   }
 
   async function renderLeft() {
@@ -425,8 +424,7 @@
       .map(([abbr, label, note, live]) => `<div><span class="game-icon ${live ? '' : 'muted'}">${abbr}</span><b>${label}</b>${note}</div>`).join('');
   }
 
-  window.addEventListener('hashchange', () => { if (location.hash === '#me') { Veridium.clearMe(); renderSetup(); } });
-  if (location.hash === '#me' && !Veridium.getMe()) renderSetup(); else renderLeft();
+  renderLeft();
   renderFeed();
   renderRight();
 </script>

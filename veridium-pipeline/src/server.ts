@@ -2,6 +2,8 @@ import { timingSafeEqual } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express, { type RequestHandler } from 'express';
+import { sessions } from './auth/http';
+import { AuthRepo } from './auth/repo';
 import { Store } from './cache/store';
 import { config } from './config';
 import { RiotClient } from './riot/client';
@@ -14,14 +16,15 @@ import {
   playerApplicationsRouter,
   vacanciesRouter,
 } from './routes/organizations';
+import { authRouter } from './routes/auth';
 import { playersRouter } from './routes/players';
 import type { IngestDeps } from './tft/ingest';
 
 const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 
 /**
- * Optional site-wide password (HTTP Basic auth, any username). There are no accounts yet, so
- * this is what keeps a deployed prototype from being edited by anyone who finds the URL.
+ * Optional site-wide password (HTTP Basic auth, any username), on top of accounts: keeps a
+ * deployed prototype private to the people you give the password to.
  */
 function requirePassword(password: string): RequestHandler {
   const expected = Buffer.from(password);
@@ -39,13 +42,17 @@ function requirePassword(password: string): RequestHandler {
 export function createApp(
   deps: IngestDeps,
   orgs = new OrgRepo(deps.store.db),
-  opts: { sitePassword?: string } = {},
+  opts: { sitePassword?: string; auth?: AuthRepo } = {},
 ) {
   const app = express();
+  app.set('trust proxy', 1); // behind Render's TLS proxy: req.secure reflects the visitor's HTTPS
   if (opts.sitePassword) app.use(requirePassword(opts.sitePassword));
   app.use(express.json());
+  const auth = opts.auth ?? new AuthRepo(deps.store.db);
+  app.use(sessions(auth));
   app.use('/api/players', playersRouter(deps));
-  const orgDeps = { ...deps, orgs };
+  const orgDeps = { ...deps, orgs, auth };
+  app.use('/api/auth', authRouter(orgDeps));
   app.use('/api/players', playerApplicationsRouter(orgDeps));
   app.use('/api/organizations', organizationsRouter(orgDeps));
   app.use('/api/vacancies', vacanciesRouter(orgDeps));

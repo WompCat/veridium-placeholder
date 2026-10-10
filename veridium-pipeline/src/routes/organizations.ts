@@ -1,15 +1,19 @@
 import { Router, type ErrorRequestHandler, type Request } from 'express';
+import { requireLinkedPlayer, requireOrgAdmin, requireUser } from '../auth/http';
+import type { AuthRepo } from '../auth/repo';
 import { buildFeed, listPlayerSummaries } from '../feed';
-import { badRequest, HttpError, notFound } from '../orgs/errors';
+import { badRequest, conflict, forbidden, HttpError, notFound } from '../orgs/errors';
 import { playerSummary } from '../orgs/players';
 import type { NewVacancy, OrgRepo, VacancyPatch } from '../orgs/repo';
 import { parseRiotId, type IngestDeps } from '../tft/ingest';
 import type { MembershipStatus, PlayerSummary, VacancyLevel, VacancyStatus } from '../types';
 
-// No accounts or permissions exist yet: every route here is open. See README "Open decisions".
+// Reading orgs, rosters and vacancies is public. Managing an org (roster, vacancies, applicants)
+// takes one of its admins; applying takes a logged-in account with a linked Riot ID.
 
 export interface OrgDeps extends IngestDeps {
   orgs: OrgRepo;
+  auth: AuthRepo;
 }
 
 const MEMBERSHIP_STATUSES: MembershipStatus[] = ['active', 'bench'];
@@ -93,10 +97,24 @@ export function organizationsRouter(deps: OrgDeps): Router {
     res.json(orgs.listOrganizations());
   });
 
+  // `viewer` tells the dashboard what the current account may do here.
   router.get('/:id', (req, res) => {
     const org = orgs.requireOrganization(req.params.id);
-    res.json({ ...org, rosterSize: orgs.listRoster(org.id).length });
+    const isAdmin = !!req.user && deps.auth.isOrgAdmin(org.id, req.user.id);
+    const canClaim = !deps.auth.orgHasAdmins(org.id);
+    res.json({ ...org, rosterSize: orgs.listRoster(org.id).length, viewer: { loggedIn: !!req.user, isAdmin, canClaim } });
   });
+
+  // An org nobody manages yet (e.g. one created by the seed script) can be claimed by its first admin.
+  router.post('/:id/claim', (req, res) => {
+    const user = requireUser(req);
+    const org = orgs.requireOrganization(req.params.id);
+    if (deps.auth.orgHasAdmins(org.id)) throw conflict('This organization already has an admin.');
+    deps.auth.addOrgAdmin(org.id, user.id);
+    res.status(201).json({ organizationId: org.id, isAdmin: true });
+  });
+
+  const adminOf = (req: Request) => requireOrgAdmin(deps.auth, req, orgs.requireOrganization(String(req.params.id)).id);
 
   // Roster: current members joined against their verified player stats.
   router.get('/:id/roster', (req, res) => {
@@ -105,6 +123,7 @@ export function organizationsRouter(deps: OrgDeps): Router {
   });
 
   router.post('/:id/roster', (req, res) => {
+    adminOf(req);
     const b = body(req);
     const puuid = resolvePlayer(deps, b);
     const membership = orgs.addMember(
@@ -117,6 +136,7 @@ export function organizationsRouter(deps: OrgDeps): Router {
   });
 
   router.patch('/:id/roster/:playerPuuid', (req, res) => {
+    adminOf(req);
     const b = body(req);
     const patch = { role: text(b, 'role', { max: 40 }), status: oneOf(b, 'status', MEMBERSHIP_STATUSES) };
     if (!patch.role && !patch.status) throw badRequest('Nothing to update: send "role" and/or "status"');
@@ -128,6 +148,7 @@ export function organizationsRouter(deps: OrgDeps): Router {
   });
 
   router.delete('/:id/roster/:playerPuuid', (req, res) => {
+    adminOf(req);
     res.json(orgs.removeMember(req.params.id, req.params.playerPuuid));
   });
 
@@ -138,6 +159,7 @@ export function organizationsRouter(deps: OrgDeps): Router {
   });
 
   router.post('/:id/vacancies', (req, res) => {
+    adminOf(req);
     const b = body(req);
     const vacancy: NewVacancy = {
       title: text(b, 'title', { required: true, max: 80 }),
@@ -176,6 +198,7 @@ export function vacanciesRouter(deps: OrgDeps): Router {
   });
 
   router.patch('/:id', (req, res) => {
+    requireOrgAdmin(deps.auth, req, orgs.requireVacancy(req.params.id).organizationId);
     const b = body(req);
     const patch: VacancyPatch = {
       title: text(b, 'title', { max: 80 }),
@@ -190,15 +213,18 @@ export function vacanciesRouter(deps: OrgDeps): Router {
     res.json(orgs.updateVacancy(req.params.id, changes));
   });
 
-  // A player applies; their verified profile is their resume, read live, never copied into the application.
+  // A player applies as their own account's Riot ID; their verified profile is the resume,
+  // read live, never copied into the application.
   router.post('/:id/applications', (req, res) => {
-    const puuid = resolvePlayer(deps, body(req));
+    const puuid = requireLinkedPlayer(req);
     const application = orgs.createApplication(req.params.id, puuid);
     res.status(201).json({ ...application, player: summary(deps, puuid) });
   });
 
+  // Applicants and decisions are private to the org's admins.
   router.get('/:id/applications', (req, res) => {
     const vacancy = orgs.requireVacancy(req.params.id);
+    requireOrgAdmin(deps.auth, req, vacancy.organizationId);
     res.json(
       orgs.listApplications(vacancy.id).map((a) => ({
         ...a,
@@ -220,9 +246,16 @@ export function applicationsRouter(deps: OrgDeps): Router {
   const { orgs } = deps;
   const router = Router();
 
+  const adminOfApplication = (req: Request) => {
+    const application = orgs.getApplication(String(req.params.id));
+    if (!application) throw notFound('Application not found');
+    requireOrgAdmin(deps.auth, req, orgs.requireVacancy(application.vacancyId).organizationId);
+  };
+
   router.patch('/:id', (req, res) => {
     const b = body(req);
     const decision = oneOf(b, 'status', ['accepted', 'rejected'], true)!;
+    adminOfApplication(req);
     const result = orgs.decideApplication(req.params.id, decision, {
       addToRoster: flag(b, 'addToRoster'),
       role: text(b, 'role', { max: 40 }),
@@ -233,6 +266,7 @@ export function applicationsRouter(deps: OrgDeps): Router {
 
   // One click from the applicants view: roster entry pre-filled from the application and vacancy.
   router.post('/:id/roster', (req, res) => {
+    adminOfApplication(req);
     const b = body(req);
     const membership = orgs.addApplicantToRoster(req.params.id, {
       role: text(b, 'role', { max: 40 }),
@@ -253,10 +287,14 @@ export function playerApplicationsRouter(deps: OrgDeps): Router {
     res.json(listPlayerSummaries(deps));
   });
 
+  // A player's applications and their outcomes are visible to that player only.
   router.get('/:region/:riotId/applications', (req, res) => {
+    const user = requireUser(req);
     const { gameName, tagLine } = parseRiotId(req.params.riotId);
     const player = deps.store.findPlayer(gameName, tagLine, req.params.region);
-    res.json(player ? deps.orgs.listPlayerApplications(player.puuid) : []);
+    if (!player) return void res.json([]);
+    if (player.puuid !== user.playerPuuid) throw forbidden('Applications are private to the player.');
+    res.json(deps.orgs.listPlayerApplications(player.puuid));
   });
 
   router.use(errorHandler);

@@ -246,22 +246,16 @@
 
   document.querySelector('#createForm select').innerHTML = regionOptions('na1');
 
-  // Create Your Profile: load the Riot ID's verified stats, make it "me", and open the home feed.
-  $('createForm').addEventListener('submit', async (e) => {
+  // Already logged in: the hero points to the home feed instead of sign-up.
+  if (Veridium.getAccount()) {
+    $('createForm').outerHTML = '<a class="btn primary" href="/" style="height:50px;padding:0 26px;font-size:15px;border-radius:12px">Go to your home feed</a>';
+  }
+
+  // Create Your Profile: continue to sign-up with the Riot ID filled in.
+  $('createForm')?.addEventListener('submit', (e) => {
     e.preventDefault();
     const f = Object.fromEntries(new FormData(e.target));
-    const btn = e.target.querySelector('button');
-    btn.disabled = true;
-    setMsg($('createMsg'), 'Loading your verified match history from Riot…');
-    try {
-      const p = await loadPlayer(f.riotId.trim(), f.region);
-      Veridium.setMe(p.riotId, p.region);
-      setMsg($('createMsg'), `Welcome, ${p.riotId.split('#')[0]}! Opening your home feed…`, 'ok');
-      location.href = '/';
-    } catch (err) {
-      setMsg($('createMsg'), err.message, 'error');
-      btn.disabled = false;
-    }
+    location.href = `login.html?${new URLSearchParams({ mode: 'signup', riotId: f.riotId.trim(), region: f.region })}`;
   });
 
   // The hero card shows a real verified player: the top-ranked one on this instance.

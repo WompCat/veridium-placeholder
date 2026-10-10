@@ -23,5 +23,5 @@ services:
       - key: RIOT_API_KEY
         sync: false # entered in the dashboard; dev keys expire every 24h
       - key: SITE_PASSWORD
-        sync: false # strongly recommended: there are no accounts yet
+        sync: false # recommended: keeps the site private while orgs are claimed by their first admin
       # PORT is injected by Render; the app reads process.env.PORT.
