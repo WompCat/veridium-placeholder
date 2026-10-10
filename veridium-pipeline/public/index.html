@@ -53,6 +53,9 @@
   .match-cols { display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: 12px; color: var(--muted); }
   .match-cols b { display: block; color: var(--text); font-size: 13px; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .match-card .art { display: grid; place-content: center; text-align: center; color: #fff; padding: 12px; }
+  .match-card .art strong { font-size: 34px; line-height: 1; letter-spacing: -.02em; text-shadow: 0 2px 12px rgba(0,0,0,.35); }
+  .match-card .art span { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; opacity: .85; margin-top: 6px; }
   .match-card .art.lol { background: radial-gradient(circle at 70% 40%, #e2b65a 0, transparent 55%), linear-gradient(120deg, #1a1408, #5c3f10 55%, #c89b3c); }
   .lol-chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 2px 9px 2px 3px; font-size: 12px; font-weight: 600; }
   .lol-chip.win { background: #e7f7ee; color: var(--good); }
@@ -114,7 +117,7 @@
     <section class="card pad composer-card">
       <div class="composer">
         <span class="mini-avatar" id="composerAvatar" style="width:42px;height:42px">?</span>
-        <input disabled placeholder="Posting is coming soon. For now, your matches post themselves." aria-label="Posting is coming soon" />
+        <input disabled placeholder="Posting coming soon. Your matches post themselves." title="Posting is coming soon. For now, your verified matches post themselves." aria-label="Posting is coming soon" />
       </div>
       <div class="actions3">
         <a id="shareMatch" href="players.html">🎮 Share match</a>
@@ -295,7 +298,7 @@
           </div>
           <div class="chips" aria-label="Placements, newest first">${s.games.map((g) => placeChip(g.placement)).join('')}</div>
         </div>
-        <div class="art" aria-hidden="true"></div>
+        <div class="art" aria-hidden="true"><strong>${ord(s.best)}</strong><span>best finish</span></div>
       </div>
       <div class="post-foot"><span>Verified from Riot match history</span><a href="${esc(href)}#matches">View matches →</a></div>
     </article>`;
@@ -338,7 +341,7 @@
           <div class="chips" aria-label="Games, newest first">${s.games.map((g) =>
             `<span class="lol-chip ${g.win ? 'win' : 'loss'}" title="${esc(g.champion)}: ${g.win ? 'Win' : 'Loss'}, ${g.kills}/${g.deaths}/${g.assists}"><b>${esc(g.champion.slice(0, 2))}</b>${g.kills}/${g.deaths}/${g.assists}</span>`).join('')}</div>
         </div>
-        <div class="art lol" aria-hidden="true"></div>
+        <div class="art lol" aria-hidden="true"><strong>${Math.round((s.wins / n) * 100)}%</strong><span>win rate</span></div>
       </div>
       <div class="post-foot"><span>Verified from Riot match history</span><a href="${esc(href)}">View LoL matches →</a></div>
     </article>`;
@@ -414,7 +417,7 @@
     $('players').innerHTML = players.length ? players.slice(0, 5).map((p) => `
       <div class="row-item">
         <span class="mini-avatar" style="width:38px;height:38px">${esc(p.riotId.charAt(0).toUpperCase())}</span>
-        <div class="grow"><b>${esc(name(p.riotId))} <span class="verified">✔</span></b><span class="sub">TFT · ${esc(p.rank ? fmtRank(p.rank) : 'Unranked')} · ${esc(p.region.toUpperCase())}</span></div>
+        <div class="grow"><b>${esc(name(p.riotId))} <span class="verified">✔</span></b><span class="sub">${esc(fmtBestRank(p))} · ${esc(p.region.toUpperCase())}</span></div>
         <a class="btn small" href="${esc(profileUrl(p))}">View</a>
       </div>`).join('') : '<div class="sub">No players loaded yet.</div>';
     const tracked = players.length;

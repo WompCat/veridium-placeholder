@@ -184,6 +184,18 @@ export class LolStore {
       .run(puuid, season);
   }
 
+  /** Ranked games (remakes excluded) and wins in a season. */
+  seasonRecord(puuid: string, season: number): { games: number; wins: number } {
+    const row = this.db
+      .prepare(
+        `SELECT COUNT(*) AS games, COALESCE(SUM(p.win), 0) AS wins
+         FROM lol_participants p JOIN lol_matches m ON m.match_id = p.match_id
+         WHERE p.puuid = ? AND m.season = ? AND m.remake = 0`,
+      )
+      .get(puuid, season) as { games: number; wins: number };
+    return row;
+  }
+
   /** Whether Veridium has any LoL data for this player (they've been loaded for LoL at least once). */
   hasPlayer(puuid: string): boolean {
     return !!this.db.prepare('SELECT 1 FROM lol_sync WHERE puuid = ?').get(puuid);

@@ -117,4 +117,24 @@ describe('GET /api/players', () => {
       ['Kairo#NA1', null, 0],
     ]);
   });
+
+  it('ranks players by their best rank across TFT and LoL', async () => {
+    const lol = new LolStore(store.db);
+    for (const [i, win] of [true, true, false].entries()) {
+      const m = lolMatch(10 + i, { win });
+      m.metadata.matchId = `NA1_LOLK${i}`;
+      m.info.participants[0].puuid = 'puuid-kairo';
+      lol.saveMatch(m);
+    }
+    lol.saveRanks('puuid-kairo', [{ queueType: 'RANKED_SOLO_5x5', tier: 'DIAMOND', rank: 'II', leaguePoints: 40, wins: 2, losses: 1 }], 1);
+    lol.setSyncPoint('puuid-kairo', null);
+
+    const players = (await request(app).get('/api/players')).body;
+    expect(players.map((p: any) => [p.riotId, p.bestRank?.game, p.bestRank?.tier])).toEqual([
+      ['Kairo#NA1', 'lol', 'DIAMOND'],
+      ['WompCat#NA1', 'tft', 'GOLD'],
+    ]);
+    expect(players[0].lol).toEqual({ soloRank: { tier: 'DIAMOND', division: 'II', leaguePoints: 40 }, games: 3, winRate: 0.667 });
+    expect(players[1].lol).toBeNull();
+  });
 });

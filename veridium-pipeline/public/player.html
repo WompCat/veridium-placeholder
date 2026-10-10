@@ -93,23 +93,23 @@
     </section>
 
     <!-- Overview -->
-    <section class="card pad" data-view="overview" hidden>
+    <section class="card pad" data-view="overview" id="ovTft" hidden>
       <div class="game-head">
         <div class="game-icon">TFT</div>
-        <div style="flex:1"><h2>Teamfight Tactics <span class="pill">Primary Game</span></h2><div class="sub" id="ovNote">Current season at a glance</div></div>
+        <div style="flex:1"><h2>Teamfight Tactics <span class="pill" data-primary="tft">Primary Game</span></h2><div class="sub" id="ovNote">Current season at a glance</div></div>
       </div>
       <div class="stats" id="ovStats"></div>
     </section>
     <section class="card pad" data-view="overview" id="ovLol" hidden>
       <div class="table-head"><div class="game-head" style="margin:0"><div class="game-icon" style="background:linear-gradient(135deg,#c89b3c,#6b4a12)">LoL</div>
-        <div><h2>League of Legends</h2><div class="sub" id="ovLolNote">Ranked this season</div></div></div>
+        <div><h2>League of Legends <span class="pill" data-primary="lol" hidden>Primary Game</span></h2><div class="sub" id="ovLolNote">Ranked this season</div></div></div>
         <a href="#games" data-open-lol class="sub">View LoL stats →</a></div>
       <div class="stats" id="ovLolStats" style="margin-top:12px"></div>
     </section>
-    <section class="card pad" data-view="overview" hidden>
-      <div class="table-head"><h2>Recent Matches</h2><a href="#matches" class="sub">View all matches →</a></div>
+    <section class="card pad" data-view="overview" id="ovRecent" hidden>
+      <div class="table-head"><h2>Recent Matches</h2><a href="#matches" class="sub" id="ovAll">View all matches →</a></div>
       <div class="table-wrap"><table>
-        <thead><tr><th>Date</th><th>Queue</th><th>Result</th><th>LP Change</th><th>Rank After</th></tr></thead>
+        <thead id="ovHead"><tr><th>Date</th><th>Queue</th><th>Result</th><th>LP Change</th><th>Rank After</th></tr></thead>
         <tbody id="ovMatches"></tbody>
       </table></div>
     </section>
@@ -128,7 +128,7 @@
       <div class="game-head">
         <div class="game-icon">TFT</div>
         <div style="flex:1">
-          <h2>Teamfight Tactics <span class="pill">Primary Game</span></h2>
+          <h2>Teamfight Tactics <span class="pill" data-primary="tft">Primary Game</span></h2>
           <div class="sub" id="windowNote">Riot Games · Ranked &amp; Normal</div>
         </div>
       </div>
@@ -163,7 +163,7 @@
     <section class="card pad" data-view="games" data-game="lol" hidden>
       <div class="game-head">
         <div class="game-icon" style="background:linear-gradient(135deg,#c89b3c,#6b4a12)">LoL</div>
-        <div style="flex:1"><h2>League of Legends</h2><div class="sub" id="lolNote">Ranked Solo/Duo and Flex</div></div>
+        <div style="flex:1"><h2>League of Legends <span class="pill" data-primary="lol" hidden>Primary Game</span></h2><div class="sub" id="lolNote">Ranked Solo/Duo and Flex</div></div>
       </div>
       <div id="lolBody"><div class="empty">Loading League of Legends from Riot…</div></div>
     </section>
@@ -260,7 +260,7 @@
       </div>
     </section>
     <section class="card pad">
-      <h2>Player Activity</h2>
+      <h2>TFT Activity</h2>
       <div class="rows">
         <div><span>Last Match</span><span id="lastMatch">–</span></div>
         <div><span>1st Place Rate</span><span id="top1">–</span></div>
@@ -325,7 +325,8 @@
 
   const $ = (id) => document.getElementById(id);
   const title = (s) => s ? s.charAt(0) + s.slice(1).toLowerCase() : s;
-  const fmtRank = (s) => s ? s.split(' ').map((w, i) => i === 0 ? title(w) : w).join(' ') : '–';
+  const APEX = ['MASTER', 'GRANDMASTER', 'CHALLENGER'];
+  const fmtRank = (s) => !s ? '–' : APEX.includes(s.split(' ')[0]) ? title(s.split(' ')[0]) : s.split(' ').map((w, i) => i === 0 ? title(w) : w).join(' ');
   const pct = (n) => (n * 100).toFixed(1) + '%';
   const ord = (n) => n + ({ 1: 'st', 2: 'nd', 3: 'rd' }[n] || 'th'); // TFT placements are 1–8
   const fmtDate = (d) => new Date(d + 'T12:00:00Z').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -334,6 +335,7 @@
   const view = {
     profile: null, set: null, queue: 'RANKED_TFT', expanded: false, allShown: ALL_PAGE,
     game: new URLSearchParams(location.search).get('game') === 'lol' ? 'lol' : 'tft',
+    gameChosen: new URLSearchParams(location.search).has('game'), // else the Games tab opens on the primary game
     lol: null, lolState: 'idle', lolShown: 10,
   };
   let pollTimer = null;
@@ -483,10 +485,12 @@
       tile('KDA', l.games ? l.kda.toFixed(2) : '–', l.games ? `${l.kills} / ${l.deaths} / ${l.assists}` : ''),
       tile('Top Champion', esc(l.champions[0]?.champion ?? '–'), l.champions[0] ? `${l.champions[0].games} games` : ''),
     ].join('');
+    renderPrimary();
   }
 
   function selectGame(game) {
     view.game = game;
+    view.gameChosen = true;
     const url = new URL(location.href);
     if (game === 'lol') url.searchParams.set('game', 'lol'); else url.searchParams.delete('game');
     history.replaceState(null, '', url);
@@ -497,7 +501,49 @@
     if (b) selectGame(b.dataset.game);
   });
   document.querySelector('[data-open-lol]').addEventListener('click', () => selectGame('lol'));
+  $('ovAll').addEventListener('click', () => { if (primaryGame() === 'lol') selectGame('lol'); });
   $('lolMore').addEventListener('click', () => { view.lolShown += 20; renderLol(); });
+
+  // ---- Primary game: the one the player is ranked highest in (TFT when there's no LoL data) ----
+  const TIERS = ['IRON', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'EMERALD', 'DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER'];
+  const DIVS = { IV: 0, III: 1, II: 2, I: 3 };
+  const rankScore = (r) => (r ? TIERS.indexOf(r.tier) * 400 + (APEX.includes(r.tier) ? 0 : (DIVS[r.division] ?? 0) * 100) + r.leaguePoints : -1);
+  function primaryGame() {
+    const p = view.profile, l = view.lol;
+    if (!p || !l || !(l.games || l.ranks.solo)) return 'tft';
+    if (!p.rank && !p.totalMatches) return 'lol';
+    return rankScore(l.ranks.solo) > rankScore(p.rank) ? 'lol' : 'tft';
+  }
+
+  // Overview leads with the primary game: its card first, its badge, and its recent matches.
+  function renderPrimary() {
+    const p = view.profile;
+    if (!p) return;
+    const lol = primaryGame() === 'lol';
+    if (!view.gameChosen) view.game = primaryGame();
+    for (const pill of document.querySelectorAll('[data-primary]')) pill.hidden = pill.dataset.primary !== primaryGame();
+    const [first, second] = lol ? [$('ovLol'), $('ovTft')] : [$('ovTft'), $('ovLol')];
+    first.after(second);
+    second.after($('ovRecent'));
+    if (lol) {
+      const rows = view.lol.matches.slice(0, 5);
+      $('ovHead').innerHTML = '<tr><th>Date</th><th>Queue</th><th>Champion</th><th>Result</th><th>K / D / A</th></tr>';
+      $('ovMatches').innerHTML = rows.length ? rows.map((m) => `<tr${m.remake ? ' class="dim"' : ''}><td>${fmtDate(m.date)}</td><td>${QUEUE_NAMES[m.queueId] ?? 'Ranked'}</td>
+        <td><span class="champ">${esc(m.champion.slice(0, 2))}</span>${esc(m.champion)}</td>
+        <td>${m.remake ? '<span class="wl remake">Remake</span>' : `<span class="wl ${m.win ? 'win' : 'loss'}">${m.win ? 'Win' : 'Loss'}</span>`}</td>
+        <td>${m.kills} / ${m.deaths} / ${m.assists}</td></tr>`).join('') : '<tr><td colspan="5" class="empty">No ranked games this season yet.</td></tr>';
+      $('ovAll').href = '#games';
+      $('ovAll').textContent = 'View all LoL games →';
+    } else {
+      $('ovHead').innerHTML = '<tr><th>Date</th><th>Queue</th><th>Result</th><th>LP Change</th><th>Rank After</th></tr>';
+      const recent = (p.recentMatches || []).slice(0, 5);
+      $('ovMatches').innerHTML = recent.length ? recent.map((m) => `<tr><td>${fmtDate(m.date)}</td><td>${queueLabel(m.queueType)}</td>
+        <td>${placeCell(m.placement)}</td><td>${lpCell(m)}</td><td>${m.rankAfter ? esc(fmtRank(m.rankAfter)) : '<span class="dim">—</span>'}</td></tr>`).join('')
+        : '<tr><td colspan="5" class="empty">No matches this season yet.</td></tr>';
+      $('ovAll').href = '#matches';
+      $('ovAll').textContent = 'View all matches →';
+    }
+  }
 
   // ---- Overview ----
   function renderOverview() {
@@ -511,10 +557,7 @@
       tile('Avg. Place', p.totalMatches ? p.avgPlacement.toFixed(1) : '–', `1st: ${pct(p.top1Rate ?? 0)}`),
       tile('Ranked Games', p.rankedMatches ?? '–', 'this season'),
     ].join('');
-    const recent = (p.recentMatches || []).slice(0, 5);
-    $('ovMatches').innerHTML = recent.length ? recent.map((m) => `<tr><td>${fmtDate(m.date)}</td><td>${queueLabel(m.queueType)}</td>
-      <td>${placeCell(m.placement)}</td><td>${lpCell(m)}</td><td>${m.rankAfter ? esc(fmtRank(m.rankAfter)) : '<span class="dim">—</span>'}</td></tr>`).join('')
-      : '<tr><td colspan="5" class="empty">No matches this season yet.</td></tr>';
+    renderPrimary();
   }
 
   // ---- Matches: every tracked match ----
@@ -614,7 +657,7 @@
     renderBanner();
     const last = p.recentMatches[0];
     $('lastMatch').textContent = last ? `${fmtDate(last.date)} · ${ord(last.placement)} Place` : '–';
-    $('top1').textContent = pct(p.top1Rate ?? 0);
+    $('top1').textContent = p.totalMatches ? pct(p.top1Rate ?? 0) : '–';
   }
 
   // The banner follows the game being looked at: League of Legends on the LoL view, TFT otherwise.
@@ -624,7 +667,7 @@
     const tag = p.riotId.split('#')[1];
     const apex = (r) => ['MASTER', 'GRANDMASTER', 'CHALLENGER'].includes(r.tier);
     const rankName = (r) => fmtRank(apex(r) ? r.tier : `${r.tier} ${r.division}`);
-    const lolView = view.game === 'lol' && currentTab() === 'games' && view.lol;
+    const lolView = view.lol && (currentTab() === 'games' ? view.game === 'lol' : primaryGame() === 'lol');
     if (lolView) {
       const solo = view.lol.ranks.solo;
       $('meta').textContent = `League of Legends Player · ${p.region.toUpperCase()} · #${tag}`;

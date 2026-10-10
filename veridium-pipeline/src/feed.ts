@@ -232,15 +232,15 @@ export function buildFeed(deps: IngestDeps & { orgs: OrgRepo }, limit = 20): Fee
     .slice(0, limit);
 }
 
-/** Loaded players with their verified summary: ranked players first (highest rank first), then by name. */
+/** Loaded players with their verified summary: ranked players first (best rank in any game first), then by name. */
 export function listPlayerSummaries(deps: IngestDeps): PlayerSummary[] {
   const players = deps.store.listPlayers().flatMap((p) => {
     const s = playerSummary(deps, p.puuid);
     return s ? [s] : [];
   });
   return players.sort((a, b) => {
-    if (a.rank && b.rank) return ladderScore(b.rank) - ladderScore(a.rank) || a.riotId.localeCompare(b.riotId);
-    if (a.rank || b.rank) return a.rank ? -1 : 1;
+    if (a.bestRank && b.bestRank) return ladderScore(b.bestRank) - ladderScore(a.bestRank) || a.riotId.localeCompare(b.riotId);
+    if (a.bestRank || b.bestRank) return a.bestRank ? -1 : 1;
     return a.riotId.localeCompare(b.riotId);
   });
 }

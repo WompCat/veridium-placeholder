@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="app.css" />
 <style>
   main.dir { grid-template-columns: minmax(0, 1fr) 320px; }
+  @media (max-width: 960px) { main.dir { grid-template-columns: minmax(0, 1fr); } }
   h1.page { font-size: 26px; margin: 0 0 4px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
   .pcard { display: grid; gap: 12px; padding: 16px; color: inherit; }
@@ -18,6 +19,8 @@
   .pcard .mini-avatar { width: 46px; height: 46px; font-size: 18px; }
   .pcard .nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 11px; color: var(--muted); }
   .pcard .nums b { display: block; font-size: 15px; color: var(--text); }
+  .pcard .nums .best b { color: var(--accent); }
+  .pcard .nums .best-tag { margin-left: 4px; padding: 0 5px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
   .search-local { width: 100%; border: 1px solid var(--border); background: var(--bg); border-radius: 10px; padding: 10px 12px; font: inherit; }
 </style>
 </head>
@@ -40,7 +43,7 @@
   <aside class="stack">
     <section class="card pad">
       <h2>Look up a player</h2>
-      <div class="sub" style="margin-bottom:12px">Any Riot ID. Veridium loads their verified TFT history from Riot.</div>
+      <div class="sub" style="margin-bottom:12px">Any Riot ID. Veridium loads their verified TFT and LoL history from Riot.</div>
       <form class="form-row" id="lookup">
         <label class="field" style="flex-basis:100%">Riot ID<input name="riotId" placeholder="Name#TAG" required /></label>
         <label class="field">Region<select name="region"></select></label>
@@ -64,11 +67,11 @@
     $('list').innerHTML = shown.length ? shown.map((p) => `
       <a class="card pcard" href="${esc(profileUrl(p))}">
         <div class="top"><span class="mini-avatar">${esc(p.riotId.charAt(0).toUpperCase())}</span>
-          <div><b>${esc(p.riotId.split('#')[0])}</b> <span class="verified">✔</span><div class="sub">#${esc(p.riotId.split('#')[1])} · ${esc(p.region.toUpperCase())} · TFT</div></div></div>
+          <div><b>${esc(p.riotId.split('#')[0])}</b> <span class="verified">✔</span><div class="sub">#${esc(p.riotId.split('#')[1])} · ${esc(p.region.toUpperCase())} · ${esc(playedGames(p))}</div></div></div>
         <div class="nums">
-          <span>Rank<b>${esc(p.rank ? fmtRank(p.rank) : 'Unranked')}</b></span>
-          <span>Top-4<b>${p.totalMatches ? pct(p.winRate) : '–'}</b></span>
-          <span>Games<b>${p.totalMatches}</b></span>
+          <span class="${p.bestRank?.game === 'tft' ? 'best' : ''}">TFT${p.bestRank?.game === 'tft' ? '<i class="best-tag">Best</i>' : ''}<b>${esc(fmtRank(p.rank))}</b></span>
+          <span class="${p.bestRank?.game === 'lol' ? 'best' : ''}">LoL${p.bestRank?.game === 'lol' ? '<i class="best-tag">Best</i>' : ''}<b>${esc(p.lol ? fmtRank(p.lol.soloRank) : '–')}</b></span>
+          <span>Games<b>${p.totalMatches + (p.lol?.games ?? 0)}</b></span>
         </div>
       </a>`).join('') : `<div class="card pad empty" style="grid-column:1/-1">No players match "${esc(term)}". Look them up by Riot ID →</div>`;
     const orgHits = term ? orgs.filter((o) => o.name.toLowerCase().includes(term)) : [];

@@ -11,6 +11,18 @@ function fmtRank(rank) {
   return apex ? titleCase(rank.tier) : `${titleCase(rank.tier)} ${rank.division}`;
 }
 
+const GAME_LABELS = { tft: 'TFT', lol: 'LoL' };
+
+/** A player summary's best rank across games, e.g. "LoL · Diamond II". */
+function fmtBestRank(p) {
+  return p.bestRank ? `${GAME_LABELS[p.bestRank.game]} · ${fmtRank(p.bestRank)}` : 'Unranked';
+}
+
+/** Games a player summary has data for, e.g. "TFT · LoL". */
+function playedGames(p) {
+  return [p.totalMatches || p.rank ? 'TFT' : null, p.lol?.games || p.lol?.soloRank ? 'LoL' : null].filter(Boolean).join(' · ') || 'TFT';
+}
+
 function profileUrl(player) {
   return `player.html?riotId=${encodeURIComponent(player.riotId)}&region=${encodeURIComponent(player.region)}`;
 }

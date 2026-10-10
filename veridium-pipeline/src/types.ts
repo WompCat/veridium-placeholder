@@ -82,6 +82,10 @@ export interface PlayerSummary {
   rankedMatches: number;
   winRate: number;
   avgPlacement: number;
+  /** League of Legends this season, when the player has been loaded for LoL. */
+  lol: { soloRank: RankEntry | null; games: number; winRate: number } | null;
+  /** The higher of the TFT rank and the LoL Solo/Duo rank, for lists that show one rank per player. */
+  bestRank: (RankEntry & { game: 'tft' | 'lol' }) | null;
 }
 
 export interface RosterEntry extends OrgMembership {

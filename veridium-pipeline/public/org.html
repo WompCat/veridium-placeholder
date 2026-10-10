@@ -197,8 +197,15 @@
       <td><div class="who-cell"><span class="mini-avatar">${esc(p.riotId.charAt(0).toUpperCase())}</span>
         <div><a href="${esc(profileUrl(p))}"><b>${esc(p.riotId.split('#')[0])}</b></a> <span class="verified" title="Verified">✔</span>
         <div class="sub">#${esc(p.riotId.split('#')[1])} · ${esc(p.region.toUpperCase())}</div></div></div></td>
-      <td>${esc(fmtRank(p.rank))}</td>
-      <td>${p.totalMatches ? pct(p.winRate) : '<span class="dim">—</span>'}</td>`;
+      <td>${esc(fmtRank(p.bestRank))}${p.bestRank ? `<div class="sub">${GAME_LABELS[p.bestRank.game]}</div>` : ''}</td>
+      <td>${winRateCell(p)}</td>`;
+  }
+
+  // Win rate in the game of the player's best rank: TFT top-4 rate or LoL win rate.
+  function winRateCell(p) {
+    const lol = p.lol?.games && (p.bestRank?.game === 'lol' || !p.totalMatches);
+    if (lol) return `${pct(p.lol.winRate)}<div class="sub">LoL · ${p.lol.games} games</div>`;
+    return p.totalMatches ? `${pct(p.winRate)}<div class="sub">TFT top-4</div>` : '<span class="dim">—</span>';
   }
 
   function renderRoster() {

@@ -58,7 +58,7 @@
         <input name="q" value="${escape(page === 'players' ? q : '')}" placeholder="Search players, organizations, games…" title="Tip: type a full Riot ID like Name#TAG to open that profile" aria-label="Search" />
       </form>
       <nav class="site-nav" aria-label="Main">
-        ${NAV.map(([key, label, href]) => `<a href="${href}" class="${key === page ? 'active' : ''}" ${key === page ? 'aria-current="page"' : ''}>${icon(key)}<span>${label}</span></a>`).join('')}
+        ${NAV.map(([key, label, href]) => `<a href="${href}" title="${label}" class="${key === page ? 'active' : ''}" ${key === page ? 'aria-current="page"' : ''}>${icon(key)}<span>${label}</span></a>`).join('')}
       </nav>
       ${me
         ? `<a class="me-chip" href="${playerHref(me.riotId, me.region)}" title="My profile: ${escape(me.riotId)}"><span class="mini-avatar">${escape(me.riotId.charAt(0).toUpperCase())}</span></a>`

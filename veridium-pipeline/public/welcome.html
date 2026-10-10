@@ -139,7 +139,7 @@
 <section class="proof" aria-label="Veridium in numbers">
   <div class="wrap">
     <div><b id="nPlayers">–</b><span>verified players</span></div>
-    <div><b id="nMatches">–</b><span>verified matches this set</span></div>
+    <div><b id="nMatches">–</b><span>verified games this season</span></div>
     <div><b id="nOrgs">–</b><span>organizations</span></div>
     <div><b id="nRoles">–</b><span>open roles</span></div>
   </div>
@@ -266,7 +266,8 @@
 
   // The hero card shows a real verified player: the top-ranked one on this instance.
   async function renderPreview(players) {
-    const top = players[0];
+    // The card shows TFT stats, so prefer the top player with TFT games.
+    const top = players.find((p) => p.totalMatches) ?? players[0];
     if (!top) {
       $('stageTag').textContent = 'Your verified profile will look like this';
       $('preview').querySelector('b').textContent = 'You';
@@ -297,7 +298,7 @@
   Promise.all([api('/api/players').catch(() => []), api('/api/organizations').catch(() => []), api('/api/vacancies').catch(() => [])])
     .then(([players, orgs, vacancies]) => {
       $('nPlayers').textContent = players.length;
-      $('nMatches').textContent = players.reduce((n, p) => n + p.totalMatches, 0);
+      $('nMatches').textContent = players.reduce((n, p) => n + p.totalMatches + (p.lol?.games ?? 0), 0).toLocaleString();
       $('nOrgs').textContent = orgs.length;
       $('nRoles').textContent = vacancies.length;
       renderPreview(players);
