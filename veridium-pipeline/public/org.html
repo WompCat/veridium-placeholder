@@ -78,7 +78,7 @@
     </section>
     <section class="card pad">
       <h2>Recent activity</h2>
-      <div class="sub">Roster changes, postings and applications, newest first.</div>
+      <div class="sub">Roster changes, postings and accepted players, newest first.</div>
       <div class="activity" id="activity" style="margin-top:8px"><div class="empty">Loading…</div></div>
     </section>
   </div>
@@ -304,7 +304,7 @@
   }
 
   // Overview: header counts plus pending applications, and a recent-activity feed built from
-  // roster joins, vacancy postings and applications.
+  // roster joins, vacancy postings and accepted applications.
   async function renderOverview() {
     const active = roster.filter((m) => m.status === 'active').length;
     const open = vacancies.filter((v) => v.status === 'open').length;
@@ -321,10 +321,11 @@
     const events = [
       ...roster.map((m) => ({ at: m.joinedAt, icon: '👤', text: `<b>${name(m.player)}</b> joined the roster as ${esc(m.role)}${m.status === 'bench' ? ' (bench)' : ''}` })),
       ...vacancies.map((v) => ({ at: v.postedAt, icon: '📌', text: `Posted <b>${esc(v.title)}</b>${v.status === 'closed' ? ' · now closed' : ''}` })),
-      ...applications.map((a) => ({
+      // Only accepted applications are activity; pending ones live in the applicant review, rejections stay private.
+      ...applications.filter((a) => a.status === 'accepted').map((a) => ({
         at: a.appliedAt,
-        icon: { pending: '📨', accepted: '✅', rejected: '✖️' }[a.status],
-        text: `<b>${name(a.player)}</b> applied to ${esc(a.vacancy.title)}${a.status === 'pending' ? '' : ` · ${esc(a.status)}`}`,
+        icon: '✅',
+        text: `<b>${name(a.player)}</b> was accepted for ${esc(a.vacancy.title)}`,
       })),
     ].sort((x, y) => y.at.localeCompare(x.at)).slice(0, 8);
     $('activity').innerHTML = events.length
