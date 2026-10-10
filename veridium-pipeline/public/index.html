@@ -53,6 +53,11 @@
   .match-cols { display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: 12px; color: var(--muted); }
   .match-cols b { display: block; color: var(--text); font-size: 13px; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .match-card .art.lol { background: radial-gradient(circle at 70% 40%, #e2b65a 0, transparent 55%), linear-gradient(120deg, #1a1408, #5c3f10 55%, #c89b3c); }
+  .lol-chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 2px 9px 2px 3px; font-size: 12px; font-weight: 600; }
+  .lol-chip.win { background: #e7f7ee; color: var(--good); }
+  .lol-chip.loss { background: #fdecef; color: var(--bad); }
+  .lol-chip b { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 6px; background: linear-gradient(135deg, #c89b3c, #6b4a12); color: #fff; font-size: 9px; }
   .roster-banner { margin-top: 12px; border-radius: 12px; background: linear-gradient(110deg, #0c0e24, #1d1b4d); color: #fff; padding: 18px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
   .roster-banner .org-name { font-size: 20px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; flex: 0 1 180px; }
   .roster-list { display: flex; gap: 16px; flex-wrap: wrap; border-left: 1px solid rgba(255,255,255,.18); padding-left: 20px; flex: 1; }
@@ -296,6 +301,49 @@
     </article>`;
   }
 
+  // "on Ahri", "all on Jinx", "mostly on Jinx", or "on Ashe and Jinx" / "on 4 champions", from the day's actual picks.
+  function championPhrase(games) {
+    const counts = new Map();
+    for (const g of games) counts.set(g.champion, (counts.get(g.champion) ?? 0) + 1);
+    const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+    if (games.length === 1) return `on ${ranked[0][0]}`;
+    if (ranked.length === 1) return `all on ${ranked[0][0]}`;
+    if (ranked[0][1] > games.length / 2) return `mostly on ${ranked[0][0]}`;
+    if (ranked.length === 2) return `on ${ranked[0][0]} and ${ranked[1][0]}`;
+    return `on ${ranked.length} champions`;
+  }
+
+  function lolSessionPost(s) {
+    const p = s.player;
+    const href = `${profileUrl(p)}&game=lol#games`;
+    const n = s.games.length;
+    const rank = s.soloRank ? fmtRank(s.soloRank) : 'Unranked';
+    return `<article class="card pad">
+      <div class="post-head">
+        <a class="mini-avatar" href="${esc(profileUrl(p))}">${esc(p.riotId.charAt(0).toUpperCase())}</a>
+        <div><b><a href="${esc(profileUrl(p))}">${esc(name(p.riotId))}</a></b> ${VERIFIED}
+          <div class="sub">${esc(timeAgo(s.at))} · League of Legends · Ranked</div></div>
+      </div>
+      <p class="post-text">Played ${n} ranked game${n === 1 ? '' : 's'} on ${esc(fmtDate(s.date + 'T12:00:00Z'))}: <b>${s.wins}W ${s.losses}L</b>, ${esc(championPhrase(s.games))}.</p>
+      <div class="match-card">
+        <div class="info">
+          <div class="match-top"><span class="game-icon sm" style="background:linear-gradient(135deg,#c89b3c,#6b4a12)">LoL</span>
+            <div><b>${s.wins}W – ${s.losses}L</b> <span class="sub">on the day</span></div></div>
+          <div class="match-cols">
+            <span>Solo/Duo<b>${esc(rank)}</b></span>
+            <span>Games<b>${n}</b></span>
+            <span>KDA<b>${s.kda.toFixed(2)}</b></span>
+            <span>Top Champion<b>${esc(s.topChampion)}</b></span>
+          </div>
+          <div class="chips" aria-label="Games, newest first">${s.games.map((g) =>
+            `<span class="lol-chip ${g.win ? 'win' : 'loss'}" title="${esc(g.champion)}: ${g.win ? 'Win' : 'Loss'}, ${g.kills}/${g.deaths}/${g.assists}"><b>${esc(g.champion.slice(0, 2))}</b>${g.kills}/${g.deaths}/${g.assists}</span>`).join('')}</div>
+        </div>
+        <div class="art lol" aria-hidden="true"></div>
+      </div>
+      <div class="post-foot"><span>Verified from Riot match history</span><a href="${esc(href)}">View LoL matches →</a></div>
+    </article>`;
+  }
+
   function rosterPost(j) {
     const org = j.organization;
     const orgHref = `org.html?id=${encodeURIComponent(org.id)}`;
@@ -342,7 +390,7 @@
       const items = await api(`/api/feed?limit=${feedLimit + 1}`); // one extra tells us whether there's more
       const shown = items.slice(0, feedLimit);
       $('feed').innerHTML = shown.length
-        ? shown.map((i) => ({ session: sessionPost, roster_join: rosterPost, vacancy: vacancyPost })[i.type](i)).join('') +
+        ? shown.map((i) => ({ session: sessionPost, lol_session: lolSessionPost, roster_join: rosterPost, vacancy: vacancyPost })[i.type](i)).join('') +
           (items.length > feedLimit ? '<button class="expand" id="moreFeed">Show more activity <span class="chev">▾</span></button>' : '')
         : '<section class="card pad empty">No activity yet. Load a player profile or post a vacancy and it shows up here.</section>';
       $('moreFeed')?.addEventListener('click', () => {

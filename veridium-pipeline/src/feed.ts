@@ -1,10 +1,13 @@
+import { LolStore } from './lol/store';
+import type { LolRank } from './lol/types';
 import type { OrgRepo } from './orgs/repo';
 import { playerSummary } from './orgs/players';
 import { ladderScore } from './tft/aggregate';
 import type { IngestDeps } from './tft/ingest';
 import type { PlayerSummary, QueueType } from './types';
 
-// The home feed is built from what actually happened on the platform. There are no user posts yet.
+// The home feed is built from what actually happened on the platform (TFT and League of Legends games,
+// roster signings, vacancies). There are no user posts yet.
 
 export interface SessionItem {
   type: 'session'; // one player's TFT games on one day
@@ -35,7 +38,20 @@ export interface VacancyItem {
   vacancy: { id: string; title: string; role: string | null; game: string; region: string; level: string; status: string };
 }
 
-export type FeedItem = SessionItem | RosterJoinItem | VacancyItem;
+export interface LolSessionItem {
+  type: 'lol_session'; // one player's ranked League of Legends games on one day (remakes left out)
+  at: string;
+  player: PlayerSummary;
+  soloRank: LolRank | null;
+  date: string; // YYYY-MM-DD
+  games: Array<{ matchId: string; queueId: number; champion: string; role: string; win: boolean; kills: number; deaths: number; assists: number }>; // newest first
+  wins: number;
+  losses: number;
+  kda: number; // (kills + assists) / max(1, deaths) over the day
+  topChampion: string;
+}
+
+export type FeedItem = SessionItem | LolSessionItem | RosterJoinItem | VacancyItem;
 
 const RECENT_MATCHUPS = 400; // how far back to look for sessions
 
@@ -145,7 +161,73 @@ export function buildFeed(deps: IngestDeps & { orgs: OrgRepo }, limit = 20): Fee
     vacancy: { id: v.id, title: v.title, role: v.role, game: v.game, region: v.region, level: v.level, status: v.status },
   }));
 
-  return [...sessions.values(), ...joinItems, ...vacancyItems]
+  // League of Legends: the same per-player-per-day grouping, from loaded players only, remakes excluded.
+  const lolRows = db
+    .prepare(
+      `SELECT p.puuid, p.match_id, p.champion, p.role, p.win, p.kills, p.deaths, p.assists, m.game_end, m.queue_id
+       FROM lol_participants p
+       JOIN players pl ON pl.puuid = p.puuid
+       JOIN lol_matches m ON m.match_id = p.match_id
+       WHERE m.remake = 0
+       ORDER BY m.game_end DESC LIMIT ?`,
+    )
+    .all(RECENT_MATCHUPS) as Array<{
+    puuid: string;
+    match_id: string;
+    champion: string;
+    role: string;
+    win: number;
+    kills: number;
+    deaths: number;
+    assists: number;
+    game_end: number;
+    queue_id: number;
+  }>;
+  const lolStore = new LolStore(db);
+  const lolSessions = new Map<string, LolSessionItem>();
+  for (const r of lolRows) {
+    const date = new Date(r.game_end).toISOString().slice(0, 10);
+    const key = `${r.puuid}|${date}`;
+    let s = lolSessions.get(key);
+    if (!s) {
+      const player = summary(r.puuid);
+      if (!player) continue;
+      s = {
+        type: 'lol_session',
+        at: new Date(r.game_end).toISOString(),
+        player,
+        soloRank: lolStore.latestRank(r.puuid, 'RANKED_SOLO_5x5'),
+        date,
+        games: [],
+        wins: 0,
+        losses: 0,
+        kda: 0,
+        topChampion: '',
+      };
+      lolSessions.set(key, s);
+    }
+    s.games.push({
+      matchId: r.match_id,
+      queueId: r.queue_id,
+      champion: r.champion,
+      role: r.role,
+      win: r.win === 1,
+      kills: r.kills,
+      deaths: r.deaths,
+      assists: r.assists,
+    });
+  }
+  for (const s of lolSessions.values()) {
+    s.wins = s.games.filter((g) => g.win).length;
+    s.losses = s.games.length - s.wins;
+    const total = (key: 'kills' | 'deaths' | 'assists') => s.games.reduce((t, g) => t + g[key], 0);
+    s.kda = Math.round(((total('kills') + total('assists')) / Math.max(1, total('deaths'))) * 100) / 100;
+    const counts = new Map<string, number>();
+    for (const g of s.games) counts.set(g.champion, (counts.get(g.champion) ?? 0) + 1);
+    s.topChampion = [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  }
+
+  return [...sessions.values(), ...lolSessions.values(), ...joinItems, ...vacancyItems]
     .sort((a, b) => b.at.localeCompare(a.at))
     .slice(0, limit);
 }

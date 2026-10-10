@@ -137,7 +137,7 @@ remembered in this browser (localStorage). It drives the Home profile card and t
 It's a convenience, not a login: anyone can still view and apply as any Riot ID.
 
 **Nothing on the home screen is invented.** The feed is built from real events (`GET /api/feed`):
-each player's TFT games grouped by day, roster signings, and vacancy postings. Posting, likes,
+each player's TFT and League of Legends games grouped by day, roster signings, and vacancy postings. Posting, likes,
 comments, follows and esports news don't exist yet, so those parts of the mockup are either
 replaced with real data (open vacancies, players on Veridium) or clearly marked "coming soon".
 
@@ -174,7 +174,7 @@ their profile.
 | `GET /api/players/:region/:riotId/applications` | a player's own applications with vacancy, org and status |
 | `GET /api/players` | every loaded player with verified stats, highest rank first |
 | `GET /api/players/:region/:riotId/lol` | League of Legends ranked profile for the current season (`?cached=1` for cache only) |
-| `GET /api/feed?limit=` | home feed: TFT sessions (one per player per day), roster joins, vacancies |
+| `GET /api/feed?limit=` | home feed: TFT and League of Legends sessions (one per player per game per day; LoL remakes left out), roster joins, vacancies |
 
 Players must already be cached by the pipeline (their profile loaded once) before they can be
 rostered or apply. Otherwise the API returns 404. The Org Dashboard and Jobs pages load the

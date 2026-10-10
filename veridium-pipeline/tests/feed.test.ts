@@ -5,6 +5,8 @@ import { OrgRepo } from '../src/orgs/repo';
 import { RiotClient } from '../src/riot/client';
 import { createApp } from '../src/server';
 import { toMatchups } from '../src/tft/transform';
+import { LolStore } from '../src/lol/store';
+import { lolMatch } from './fixtures/lol';
 import { BASE_TIME, PUUID, makeMatch } from './fixtures/riot';
 
 const HOUR = 3_600_000;
@@ -62,6 +64,48 @@ describe('GET /api/feed', () => {
     expect(feed).toHaveLength(1);
     const all = (await request(app).get('/api/feed')).body;
     expect(all.every((i: any) => i.player.riotId === 'WompCat#NA1')).toBe(true);
+  });
+});
+
+describe('League of Legends in the feed', () => {
+  it('groups ranked LoL games per player-day, leaving remakes out', async () => {
+    const lol = new LolStore(store.db);
+    // Sep 25 2026 is day 267 of the year: two wins and a loss, plus a remake.
+    const day = 267;
+    const games = [
+      lolMatch(day, { win: true, champion: 'Jinx', role: 'BOTTOM', k: 7, d: 2, a: 9 }),
+      lolMatch(day, { win: true, champion: 'Jinx', role: 'BOTTOM', k: 5, d: 1, a: 4 }),
+      lolMatch(day, { win: false, champion: 'Ahri', role: 'MIDDLE', k: 2, d: 5, a: 3 }),
+      lolMatch(day, { win: false, champion: 'Ahri', k: 0, d: 0, a: 0 }),
+    ].map((m, i) => {
+      m.metadata.matchId = `NA1_LOL${i}`;
+      m.info.gameEndTimestamp += i * HOUR;
+      return m;
+    });
+    games[3].info.participants.forEach((p) => (p.gameEndedInEarlySurrender = true));
+    for (const m of games) lol.saveMatch(m);
+    lol.saveRanks(PUUID, [{ queueType: 'RANKED_SOLO_5x5', tier: 'PLATINUM', rank: 'III', leaguePoints: 51, wins: 20, losses: 18 }], 1);
+
+    const feed = (await request(app).get('/api/feed')).body;
+    const lolItems = feed.filter((i: any) => i.type === 'lol_session');
+
+    expect(lolItems).toHaveLength(1);
+    expect(lolItems[0]).toMatchObject({
+      date: '2026-09-25',
+      wins: 2,
+      losses: 1,
+      kda: 3.75, // (14 + 16) / 8
+      topChampion: 'Jinx',
+      soloRank: { tier: 'PLATINUM', division: 'III', leaguePoints: 51 },
+      player: { riotId: 'WompCat#NA1' },
+    });
+    expect(lolItems[0].games.map((g: any) => [g.matchId, g.win])).toEqual([
+      ['NA1_LOL2', false],
+      ['NA1_LOL1', true],
+      ['NA1_LOL0', true],
+    ]);
+    // Newest first across games: the LoL day (Sep 25) sits between the TFT days (Sep 22 / 21) and later org events.
+    expect(feed.map((i: any) => i.type)).toEqual(['lol_session', 'session', 'session']);
   });
 });
 
