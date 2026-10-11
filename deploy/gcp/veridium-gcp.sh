@@ -59,7 +59,7 @@ preflight() {
   micros=$(g compute instances list --filter='machineType~e2-micro' --format='value(name)' | grep -vx "$NAME" || true)
   [ -z "$micros" ] || die "This project already runs an e2-micro ($micros). Only one is free."
   git ls-remote --exit-code --heads "$REPO" "$BRANCH" >/dev/null \
-    || die "Branch '$BRANCH' doesn't exist on GitHub yet. Create it, or run with BRANCH=claude/build-order-review-rbzbu7"
+    || die "Branch '$BRANCH' doesn't exist on GitHub yet. Push it, or run with BRANCH=<an existing branch>"
   cat <<EOF
 
 About to create, in project $PROJECT:

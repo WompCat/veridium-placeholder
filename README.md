@@ -12,7 +12,6 @@ Verified esports player profiles. `veridium-pipeline/` holds:
 ```powershell
 git clone https://github.com/WompCat/veridium-placeholder.git "C:\Users\Anthony\Projects\Veridium Placeholder"
 cd "C:\Users\Anthony\Projects\Veridium Placeholder\veridium-pipeline"
-git checkout claude/build-order-review-rbzbu7
 npm install
 copy .env.example .env      # then paste your RIOT_API_KEY into .env
 npm test                    # mocked Riot responses, no key needed
@@ -32,10 +31,10 @@ GitHub page: **Code → Codespaces → Create codespace on main**. Add your key 
 named `RIOT_API_KEY` (GitHub → Settings → Codespaces), then in the Codespace terminal:
 `cd veridium-pipeline && npm run dev`, and open the forwarded port 4000.
 
-### In a Claude Code cloud session
+### Behind an outbound proxy
 
-The environment's network proxy injects the Riot key, so no real key lives in the container. Node's
-`fetch` only goes through that proxy when told to:
+If outbound traffic goes through a proxy (for example one that adds the Riot key itself, so no real key
+lives on the machine), Node's `fetch` only uses it when told to:
 
 ```bash
 NODE_USE_ENV_PROXY=1 RIOT_API_KEY=proxy-injected npm run ingest -- "WompCat#NA1" na1
