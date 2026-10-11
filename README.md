@@ -240,7 +240,15 @@ unchanged. To change the schema, add the next numbered file. Never edit one that
   it in a new migration once that's decided.
 - **Obscurity Esports** was a test org from an old seed script; migration `007_remove_test_org.sql` removes it.
 
-## Deploying (Render)
+## Deploying (Google Cloud free VM)
+
+The primary host is one **Always Free e2-micro** VM on Google Cloud, with a persistent data disk for
+the sqlite database. Everything is in [`deploy/gcp/`](deploy/gcp/README.md): run
+`bash deploy/gcp/veridium-gcp.sh create` in Google Cloud Shell. Afterwards, `set-key` takes the daily
+Riot key, `deploy` ships new code and `verify` runs the crash and reboot test. The Render setup below
+stays as a fallback.
+
+## Deploying (Render, fallback)
 
 The app is one Node process plus a sqlite file, so it needs a host with a **persistent disk**.
 Serverless hosts (Vercel, Netlify functions) won't work, because the database would vanish
