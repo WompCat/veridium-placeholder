@@ -98,3 +98,33 @@ function submitApplication(vacancyId, under18) {
 
 /** The "Verified" badge Veridium staff grant to organizations. */
 const ORG_VERIFIED = '<span class="org-verified" title="Verified by Veridium: this organization is who it says it is">✔ Verified</span>';
+
+/**
+ * A Follow button for a player (id = PUUID) or org. `el` is the button; `countEl` shows followers.
+ * Logged out, clicking goes to log in. Hidden for your own profile (`hide`).
+ */
+async function setupFollow(el, countEl, type, id, { hide = false } = {}) {
+  const path = `/api/follows/${type}/${encodeURIComponent(id)}`;
+  const render = (s) => {
+    el.hidden = hide;
+    el.classList.toggle('on', s.following);
+    el.textContent = s.following ? '✓ Following' : '+ Follow';
+    el.setAttribute('aria-pressed', String(s.following));
+    countEl.textContent = `${s.followers} follower${s.followers === 1 ? '' : 's'}`;
+  };
+  let state = await api(path).catch(() => null);
+  if (!state) return;
+  render(state);
+  el.onclick = async () => {
+    if (!Veridium.getAccount()) { location.href = Veridium.loginHref(); return; }
+    el.disabled = true;
+    try {
+      state = await api(path, { method: state.following ? 'DELETE' : 'PUT', body: {} });
+      render(state);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      el.disabled = false;
+    }
+  };
+}

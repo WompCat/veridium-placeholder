@@ -56,6 +56,7 @@
       <div class="who">
         <h1><span id="orgName">Loading…</span> <span class="org-verified" id="orgVerified" hidden title="Verified by Veridium: this organization is who it says it is">✔ Verified</span></h1>
         <div class="meta" id="orgMeta">Organization</div>
+        <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap"><button class="follow-btn" id="followBtn" type="button" hidden></button><span class="followers" id="followers"></span></div>
       </div>
       <div class="kpis">
         <div class="kpi"><b id="kActive">–</b><span>Active</span></div>
@@ -567,6 +568,7 @@
       org = await api(base);
       applyViewer();
       renderAbout();
+      setupFollow($('followBtn'), $('followers'), 'org', org.id);
       $('orgName').textContent = org.name;
       $('orgLogo').textContent = org.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
       document.title = `${org.name} · Veridium`;

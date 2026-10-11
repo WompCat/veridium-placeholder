@@ -6,6 +6,8 @@ import { RiotClient } from '../src/riot/client';
 import { createApp } from '../src/server';
 import { toMatchups } from '../src/tft/transform';
 import { LolStore } from '../src/lol/store';
+import { AuthRepo } from '../src/auth/repo';
+import { TERMS_VERSION } from '../src/legal';
 import { lolMatch } from './fixtures/lol';
 import { BASE_TIME, PUUID, makeMatch } from './fixtures/riot';
 
@@ -64,6 +66,36 @@ describe('GET /api/feed', () => {
     expect(feed).toHaveLength(1);
     const all = (await request(app).get('/api/feed')).body;
     expect(all.every((i: any) => i.player.riotId === 'WompCat#NA1')).toBe(true);
+  });
+});
+
+describe('following', () => {
+  it('follows players and orgs, shows counts, and filters the feed to what you follow', async () => {
+    const auth = new AuthRepo(store.db);
+    const fan = auth.createUser('fan@cat.gg', 'unused-hash', 'puuid-kairo', TERMS_VERSION); // Kairo's own account
+    const cookie = `veridium_session=${auth.createSession(fan.id).token}`;
+    orgs.createVacancy('obscurity-esports', { title: 'Flex Player', role: 'Flex', game: 'TFT', region: 'NA', level: 'competitive' });
+
+    expect((await request(app).put(`/api/follows/player/${PUUID}`)).status).toBe(401);
+    expect((await request(app).put('/api/follows/player/puuid-kairo').set('Cookie', cookie)).status).toBe(400); // yourself
+    expect((await request(app).put('/api/follows/team/x').set('Cookie', cookie)).status).toBe(400);
+    expect((await request(app).put('/api/follows/org/nope').set('Cookie', cookie)).status).toBe(404);
+
+    // Following nobody: an empty Following feed.
+    expect((await request(app).get('/api/feed?following=1').set('Cookie', cookie)).body).toEqual([]);
+    expect((await request(app).get('/api/feed?following=1')).status).toBe(401);
+
+    const followed = await request(app).put(`/api/follows/player/${PUUID}`).set('Cookie', cookie);
+    expect(followed.body).toEqual({ followers: 1, following: true });
+    expect((await request(app).get(`/api/follows/player/${PUUID}`)).body).toEqual({ followers: 1, following: false }); // logged out
+    const feed = (await request(app).get('/api/feed?following=1').set('Cookie', cookie)).body;
+    expect(feed.map((i: any) => i.type)).toEqual(['session', 'session']); // WompCat's games, not the org's vacancy
+
+    await request(app).put('/api/follows/org/obscurity-esports').set('Cookie', cookie);
+    expect((await request(app).get('/api/feed?following=1').set('Cookie', cookie)).body.map((i: any) => i.type)).toEqual(['vacancy', 'session', 'session']);
+
+    expect((await request(app).delete(`/api/follows/player/${PUUID}`).set('Cookie', cookie)).body).toEqual({ followers: 0, following: false });
+    expect((await request(app).get('/api/feed?following=1').set('Cookie', cookie)).body.map((i: any) => i.type)).toEqual(['vacancy']);
   });
 });
 

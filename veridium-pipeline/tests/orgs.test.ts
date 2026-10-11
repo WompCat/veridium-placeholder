@@ -95,6 +95,7 @@ describe('migrations', () => {
       { version: '010_looking_for_team.sql' },
       { version: '011_notifications.sql' },
       { version: '012_org_profiles.sql' },
+      { version: '013_follows.sql' },
     ]);
     const tables = reopened.db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`).all();
     expect(tables.map((t: any) => t.name)).toEqual(

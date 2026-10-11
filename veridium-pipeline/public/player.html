@@ -76,6 +76,8 @@
           <div class="banner-actions">
             <button class="ghost" id="share" type="button">🔗 Share Profile</button>
             <button class="ghost" id="thisIsMe" type="button">⭐ This is me</button>
+            <button class="follow-btn" id="followBtn" type="button" hidden></button>
+            <span class="followers" id="followers"></span>
           </div>
         </div>
         <div class="rank-badge">
@@ -836,11 +838,40 @@
     return !!(me && view.profile && me.riotId.toLowerCase() === view.profile.riotId.toLowerCase() && me.region === view.profile.region);
   }
 
+  // Follow (this page doesn't load common.js, so it has its own small version of setupFollow).
+  async function setupFollow(puuid) {
+    const path = `/api/follows/player/${encodeURIComponent(puuid)}`;
+    const btn = $('followBtn');
+    const render = (s) => {
+      btn.hidden = isOwnProfile();
+      btn.classList.toggle('on', s.following);
+      btn.textContent = s.following ? '✓ Following' : '+ Follow';
+      btn.setAttribute('aria-pressed', String(s.following));
+      $('followers').textContent = `${s.followers} follower${s.followers === 1 ? '' : 's'}`;
+    };
+    let s;
+    try { s = await fetch(path).then(jsonOrThrow); } catch { return; }
+    render(s);
+    btn.onclick = async () => {
+      if (!Veridium.getAccount()) { location.href = Veridium.loginHref(); return; }
+      btn.disabled = true;
+      try {
+        s = await fetch(path, { method: s.following ? 'DELETE' : 'PUT' }).then(jsonOrThrow);
+        render(s);
+      } catch (err) {
+        notice(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    };
+  }
+
   // "Looking for team" lives on the player's account; the directory's summary carries it.
   async function loadLft(riotId, region) {
     try {
       const list = await fetch(`/api/players?q=${encodeURIComponent(riotId.split('#')[0])}&region=${encodeURIComponent(region)}`).then(jsonOrThrow);
       const p = list.find((x) => x.riotId.toLowerCase() === riotId.toLowerCase());
+      if (p) setupFollow(p.puuid);
       $('lftBadge').hidden = !p?.lookingForTeam;
       if (p?.lookingForTeam) $('lftBadge').firstElementChild.textContent = `Looking for team${p.lookingForTeam.roles ? ` · ${p.lookingForTeam.roles}` : ''}`;
     } catch {}

@@ -137,6 +137,7 @@ export class OrgRepo {
       this.db.prepare('DELETE FROM vacancies WHERE organization_id = ?').run(id);
       this.db.prepare('DELETE FROM org_memberships WHERE organization_id = ?').run(id);
       this.db.prepare('DELETE FROM org_admins WHERE organization_id = ?').run(id);
+      this.db.prepare("DELETE FROM follows WHERE target_type = 'org' AND target_id = ?").run(id);
       this.db.prepare('DELETE FROM organizations WHERE id = ?').run(id);
     })();
   }

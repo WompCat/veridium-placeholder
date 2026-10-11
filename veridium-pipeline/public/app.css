@@ -267,3 +267,13 @@
 
   /* ---- "Verified" organization badge ---- */
   .org-verified { display: inline-flex; align-items: center; gap: 4px; background: #e8f0ff; color: #2f5bd6; border-radius: 999px; padding: 2px 9px; font-size: 11px; font-weight: 700; white-space: nowrap; vertical-align: middle; cursor: help; }
+
+  /* ---- Follow buttons (on the dark profile/org banners) and feed tabs ---- */
+  .follow-btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,.45); background: rgba(255,255,255,.08); color: #fff; border-radius: 9px; padding: 6px 12px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .follow-btn:hover { background: rgba(255,255,255,.16); }
+  .follow-btn.on { background: #fff; color: var(--text); border-color: #fff; }
+  .follow-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  .followers { font-size: 13px; color: rgba(255,255,255,.85); align-self: center; }
+  .feed-tabs { display: flex; gap: 6px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 4px; }
+  .feed-tabs button { flex: 1; border: 0; background: none; font: inherit; font-weight: 600; font-size: 13px; color: var(--muted); padding: 8px; border-radius: 9px; cursor: pointer; }
+  .feed-tabs button[aria-selected="true"] { background: var(--accent-soft); color: var(--accent); }

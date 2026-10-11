@@ -387,20 +387,37 @@
   const FEED_PAGE = 6;
   let feedLimit = FEED_PAGE;
 
+  // Everyone, or only the players and orgs you follow (remembered on this device).
+  let feedMode = (() => { try { return localStorage.getItem('veridium.feedMode') === 'following' ? 'following' : 'all'; } catch { return 'all'; } })();
+  const feedTabs = () => `<div class="feed-tabs" role="tablist" aria-label="Feed">
+      <button role="tab" data-mode="all" aria-selected="${feedMode === 'all'}">Everyone</button>
+      <button role="tab" data-mode="following" aria-selected="${feedMode === 'following'}">Following</button></div>`;
+  $('feed').addEventListener('click', (e) => {
+    const b = e.target.closest('.feed-tabs button');
+    if (!b || b.dataset.mode === feedMode) return;
+    feedMode = b.dataset.mode;
+    try { localStorage.setItem('veridium.feedMode', feedMode); } catch {}
+    feedLimit = FEED_PAGE;
+    renderFeed();
+  });
+
   async function renderFeed() {
     try {
-      const items = await api(`/api/feed?limit=${feedLimit + 1}`); // one extra tells us whether there's more
+      const items = await api(`/api/feed?limit=${feedLimit + 1}${feedMode === 'following' ? '&following=1' : ''}`); // one extra tells us whether there's more
       const shown = items.slice(0, feedLimit);
-      $('feed').innerHTML = shown.length
+      const empty = feedMode === 'following'
+        ? '<section class="card pad empty">Nothing here yet. Follow players and organizations from their pages, and their activity shows up here. <a href="players.html">Find players</a> · <a href="organizations.html">Organizations</a></section>'
+        : '<section class="card pad empty">No activity yet. Load a player profile or post a vacancy and it shows up here.</section>';
+      $('feed').innerHTML = feedTabs() + (shown.length
         ? shown.map((i) => ({ session: sessionPost, lol_session: lolSessionPost, roster_join: rosterPost, vacancy: vacancyPost })[i.type](i)).join('') +
           (items.length > feedLimit ? '<button class="expand" id="moreFeed">Show more activity <span class="chev">▾</span></button>' : '')
-        : '<section class="card pad empty">No activity yet. Load a player profile or post a vacancy and it shows up here.</section>';
+        : empty);
       $('moreFeed')?.addEventListener('click', () => {
         feedLimit += FEED_PAGE;
         renderFeed();
       });
     } catch (err) {
-      $('feed').innerHTML = `<section class="card pad empty">${esc(err.message)}</section>`;
+      $('feed').innerHTML = feedTabs() + `<section class="card pad empty">${esc(err.message)}</section>`;
     }
   }
 

@@ -1,6 +1,7 @@
 import { Router, type ErrorRequestHandler, type Request } from 'express';
 import { isSiteAdmin, requireLinkedPlayer, requireOrgAdmin, requireUser } from '../auth/http';
 import type { AuthRepo } from '../auth/repo';
+import type { FollowRepo, FollowTarget } from '../follows';
 import type { Notifier } from '../notifications';
 import { buildFeed, listPlayerSummaries } from '../feed';
 import { parsePlayerFilters, searchPlayers } from '../players/search';
@@ -17,6 +18,7 @@ export interface OrgDeps extends IngestDeps {
   orgs: OrgRepo;
   auth: AuthRepo;
   notifier: Notifier;
+  follows: FollowRepo;
   /** Veridium staff emails (ADMIN_EMAILS): they can verify organizations. */
   adminEmails: string[];
 }
@@ -378,13 +380,60 @@ export function notificationsRouter(deps: OrgDeps): Router {
   return router;
 }
 
+/**
+ * /api/follows/:type/:id (type: player | org; a player's id is their PUUID).
+ * GET: { followers, following }; PUT follows; DELETE unfollows. Lists of who follows whom aren't exposed.
+ */
+export function followsRouter(deps: OrgDeps): Router {
+  const router = Router();
+  const target = (req: Request): { type: FollowTarget; id: string } => {
+    const type = String(req.params.type);
+    const id = String(req.params.id);
+    if (type === 'org') deps.orgs.requireOrganization(id);
+    else if (type === 'player') { if (!deps.store.getPlayer(id)) throw notFound('Player not found'); }
+    else throw badRequest('Follow a "player" or an "org"');
+    return { type, id };
+  };
+  const state = (req: Request, t: { type: FollowTarget; id: string }) => ({
+    followers: deps.follows.followers(t.type, t.id),
+    following: !!req.user && deps.follows.isFollowing(req.user.id, t.type, t.id),
+  });
+
+  router.get('/:type/:id', (req, res) => {
+    res.json(state(req, target(req)));
+  });
+  router.put('/:type/:id', (req, res) => {
+    const user = requireUser(req);
+    const t = target(req);
+    if (t.type === 'player' && t.id === user.playerPuuid) throw badRequest("You can't follow yourself.");
+    deps.follows.follow(user.id, t.type, t.id);
+    res.json(state(req, t));
+  });
+  router.delete('/:type/:id', (req, res) => {
+    const user = requireUser(req);
+    const t = target(req);
+    deps.follows.unfollow(user.id, t.type, t.id);
+    res.json(state(req, t));
+  });
+
+  router.use(errorHandler);
+  return router;
+}
+
 /** /api/feed: recent platform activity for the home screen (cache only, no Riot calls). */
 export function feedRouter(deps: OrgDeps): Router {
   const router = Router();
 
+  // ?following=1 (logged in): only players and orgs you follow.
   router.get('/', (req, res) => {
     const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 50);
-    res.json(buildFeed(deps, limit));
+    if (req.query.following !== '1') return void res.json(buildFeed(deps, limit));
+    const { players, orgs } = deps.follows.following(requireUser(req).id);
+    const mine = buildFeed(deps, 500).filter((item) =>
+      'organization' in item
+        ? orgs.has(item.organization.id) || ('player' in item && players.has(item.player.puuid))
+        : players.has(item.player.puuid));
+    res.json(mine.slice(0, limit));
   });
 
   router.use(errorHandler);
