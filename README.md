@@ -243,7 +243,8 @@ unchanged. To change the schema, add the next numbered file. Never edit one that
 ## Deploying (Google Cloud free VM)
 
 The primary host is one **Always Free e2-micro** VM on Google Cloud, with a persistent data disk for
-the sqlite database. Everything is in [`deploy/gcp/`](deploy/gcp/README.md): run
+the sqlite database, served over HTTPS by Caddy at `https://<ip>.sslip.io` (free certificate, no
+domain needed). Everything is in [`deploy/gcp/`](deploy/gcp/README.md): run
 `bash deploy/gcp/veridium-gcp.sh create` in Google Cloud Shell. Afterwards, `set-key` takes the daily
 Riot key, `deploy` ships new code and `verify` runs the crash and reboot test. The Render setup below
 stays as a fallback.

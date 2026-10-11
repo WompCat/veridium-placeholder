@@ -1,7 +1,7 @@
 # Veridium on Google Cloud's free VM
 
 Runs Veridium on one **Always Free e2-micro** VM with its own persistent disk, so the sqlite database
-survives restarts and redeploys. `render.yaml` and the Dockerfile stay in the repo as the fallback host.
+survives restarts and redeploys. It's served over **HTTPS** from the first boot, at `https://<ip>.sslip.io`. `render.yaml` and the Dockerfile stay in the repo as the fallback host.
 
 Everything is driven by one script, run in **Google Cloud Shell**. Cloud Shell is the `>_` icon at the
 top of the Cloud console: a browser terminal where `gcloud` is already installed and logged in as you,
@@ -13,9 +13,7 @@ so nothing needs installing and no keys leave Google.
    create a project, and select it at the top of the console.
 2. **Budget alert.** Billing → Budgets & alerts → create a budget of e.g. $1 with email alerts. If
    anything ever falls outside the free tier, you hear about it instead of finding out on a bill.
-3. **Create the code branch.** The VM runs `main` by default. Until `main` exists, add
-   `BRANCH=claude/build-order-review-rbzbu7` before the command below.
-4. **Open Cloud Shell and run:**
+3. **Open Cloud Shell and run:**
 
    ```bash
    git clone https://github.com/WompCat/veridium-placeholder.git && cd veridium-placeholder
@@ -26,12 +24,13 @@ so nothing needs installing and no keys leave Google.
    - one e2-micro;
    - in `us-central1` (or `us-west1` / `us-east1`);
    - 10 GB boot disk plus 10 GB data disk, both standard (the free tier covers 30 GB);
-   - a static IP and a firewall rule for HTTP.
+   - a static IP and a firewall rule for HTTP and HTTPS.
 
    Then it asks for confirmation, your Riot key, a site password and an optional contact email.
    The VM installs everything on first boot (5–10 minutes) and the script waits until the site answers
-   at `http://<static IP>/`.
-5. **Prove it survives** a crash and a reboot with the data intact:
+   at `https://<ip-with-dashes>.sslip.io/` (for IP 34.1.2.3: `https://34-1-2-3.sslip.io/`). Plain
+   `http://` redirects there.
+4. **Prove it survives** a crash and a reboot with the data intact:
 
    ```bash
    bash deploy/gcp/veridium-gcp.sh verify
@@ -45,7 +44,7 @@ so nothing needs installing and no keys leave Google.
 | Deploy the latest code | `bash deploy/gcp/veridium-gcp.sh deploy` |
 | Address, health, recent logs | `bash deploy/gcp/veridium-gcp.sh status` |
 
-The Riot key, site password and contact email can also be changed without any command: Compute
+The Riot key, site password, contact email and domain can also be changed without any command: Compute
 Engine → VM instances → `veridium` → Edit → Metadata, edit `veridium-riot-api-key`,
 `veridium-site-password` or `veridium-contact-email`, and Save. The VM applies the change and restarts
 the app within seconds.
@@ -58,12 +57,17 @@ the app within seconds.
   - installs Node.js 22;
   - clones the repo to `/opt/veridium` on first boot, with production dependencies only;
   - installs the two services.
-- **`veridium.service`** runs the app on port 80:
-  - as an unprivileged `veridium` user, allowed to bind port 80;
+- **Caddy** (Debian's package) listens on ports 80 and 443:
+  - gets and renews a free certificate for `<ip>.sslip.io` automatically;
+  - redirects HTTP to HTTPS, adds HSTS and compression, and forwards to the app;
+  - its config, `/etc/caddy/Caddyfile`, is written by the settings watcher.
+- **`veridium.service`** runs the app on `127.0.0.1:3000`, reachable only through Caddy:
+  - as an unprivileged `veridium` user, with no special privileges;
   - restarts 3 seconds after a crash, and starts on boot;
   - can only write to its database directory.
 - **`veridium-config.service`** watches the VM's metadata:
-  - when a setting changes, it rewrites `/etc/veridium/veridium.env` (root-only) and restarts the app;
+  - when a setting changes, it rewrites `/etc/veridium/veridium.env` (root-only) and restarts the app,
+    and rewrites the Caddyfile and reloads Caddy if the hostname changed;
   - when `veridium-deploy` changes, it pulls the code first (`veridium-deploy.sh`).
   - A value containing a `'` or a newline is refused and the previous settings stay. A bad password
     never turns the site password off.
@@ -76,9 +80,7 @@ read. They're never in the repo.
 - **External IP cost.** Google began charging for external IPv4 addresses in 2024. Check the current
   pricing for your VM's address (the budget alert above will catch it either way). If it's charged,
   it's roughly $3–4 a month.
-- **No HTTPS yet.** Out of scope for this pass, but it matters: over plain HTTP, the site password,
-  login passwords and session cookies travel unencrypted. Add HTTPS before anyone uses a real
-  password on it. A next step that needs no domain: Caddy in front of the app with an
-  `<ip>.sslip.io` hostname, which gets a free certificate automatically.
+- **Custom domain later.** Point the domain's DNS `A` record at the static IP, then set the VM's
+  `veridium-domain` metadata to it (Edit → Metadata). Caddy gets a certificate for it automatically.
 - **Daily Riot key.** The development key still expires every 24 hours: `set-key` each day until Riot
   issues a production key.

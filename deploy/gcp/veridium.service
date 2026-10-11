@@ -13,9 +13,8 @@ ExecStart=/opt/veridium/veridium-pipeline/node_modules/.bin/tsx src/server.ts
 # Back up within seconds after a crash; started at boot via WantedBy below.
 Restart=always
 RestartSec=3
-# Port 80 without running as root.
-AmbientCapabilities=CAP_NET_BIND_SERVICE
-CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+# Listens on 127.0.0.1:3000 (from the env file); Caddy handles ports 80/443. No privileges needed.
+CapabilityBoundingSet=
 NoNewPrivileges=true
 # The app only writes its database (and tsx's cache in a private /tmp).
 ProtectSystem=strict

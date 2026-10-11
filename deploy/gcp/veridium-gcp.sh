@@ -2,7 +2,7 @@
 # Veridium on a Google Cloud "Always Free" e2-micro VM. Run it in Google Cloud Shell
 # (console.cloud.google.com → the >_ icon), where gcloud is already installed and logged in.
 #
-#   bash deploy/gcp/veridium-gcp.sh create    create the VM, data disk, static IP and firewall rule
+#   bash deploy/gcp/veridium-gcp.sh create    create the VM, data disk, static IP and firewall rule (HTTPS via Caddy)
 #   bash deploy/gcp/veridium-gcp.sh set-key   paste a new Riot API key (dev keys expire every 24h)
 #   bash deploy/gcp/veridium-gcp.sh deploy    pull the latest code on the VM and restart
 #   bash deploy/gcp/veridium-gcp.sh verify    crash test + reboot test, checking the site and its data survive
@@ -25,6 +25,9 @@ g() { gcloud --project "$PROJECT" "$@"; }
 say() { printf '\n\033[1m%s\033[0m\n' "$*"; }
 die() { printf '\033[31m%s\033[0m\n' "$*" >&2; exit 1; }
 ip() { g compute addresses describe "$NAME-ip" --region "$REGION" --format='value(address)'; }
+# The site's address: <ip>.sslip.io, a free hostname that resolves to the IP inside it, so the VM can
+# get a real HTTPS certificate without a domain. A `veridium-domain` metadata value overrides it on the VM.
+site() { local a; a=$(ip); echo "https://${a//./-}.sslip.io"; }
 
 # Set a metadata value from a file, so passwords with commas or spaces survive gcloud's parsing.
 set_secret() {
@@ -35,7 +38,7 @@ set_secret() {
 }
 
 wait_healthy() {
-  local url; url="http://$(ip)/api/health"
+  local url; url="$(site)/api/health"
   printf 'Waiting for %s ' "$url"
   for _ in $(seq 1 90); do
     if curl -fsS --max-time 5 "$url" >/dev/null 2>&1; then echo ' up'; return 0; fi
@@ -62,7 +65,8 @@ preflight() {
 About to create, in project $PROJECT:
   • VM "$NAME": e2-micro, zone $ZONE, Debian 12        (Always Free: 1 e2-micro in us-west1/us-central1/us-east1)
   • Disks: ${BOOT_GB} GB boot + ${DATA_GB} GB data, both pd-standard  (Always Free: 30 GB standard persistent disk)
-  • Static IP "$NAME-ip" in $REGION, firewall rule allowing HTTP (port 80)
+  • Static IP "$NAME-ip" in $REGION, firewall rule allowing HTTP and HTTPS (ports 80, 443)
+  • HTTPS: Caddy on the VM gets a free certificate for <ip>.sslip.io and redirects HTTP to HTTPS
   • Code: $REPO @ $BRANCH
 
 Before you continue, check two things in the Cloud console:
@@ -90,9 +94,9 @@ cmd_create() {
     || g compute addresses create "$NAME-ip" --region "$REGION"
   echo "IP: $(ip)"
 
-  say "Firewall: allow HTTP to VMs tagged $NAME-http"
-  g compute firewall-rules describe "$NAME-http" >/dev/null 2>&1 \
-    || g compute firewall-rules create "$NAME-http" --allow tcp:80 --target-tags "$NAME-http" --source-ranges 0.0.0.0/0
+  say "Firewall: allow HTTP and HTTPS to VMs tagged $NAME-web"
+  g compute firewall-rules describe "$NAME-web" >/dev/null 2>&1 \
+    || g compute firewall-rules create "$NAME-web" --allow tcp:80,tcp:443 --target-tags "$NAME-web" --source-ranges 0.0.0.0/0
 
   say "Data disk"
   g compute disks describe "$NAME-data" --zone "$ZONE" >/dev/null 2>&1 \
@@ -110,13 +114,14 @@ cmd_create() {
     --image-family debian-12 --image-project debian-cloud \
     --boot-disk-size "${BOOT_GB}GB" --boot-disk-type pd-standard \
     --disk "name=$NAME-data,device-name=$NAME-data,mode=rw,auto-delete=no" \
-    --address "$(ip)" --tags "$NAME-http" \
+    --address "$(ip)" --tags "$NAME-web" \
     --metadata "veridium-repo=$REPO,veridium-branch=$BRANCH" \
     --metadata-from-file "$files"
   rm -rf "$secrets"
 
   wait_healthy
-  say "Veridium is live at http://$(ip)/"
+  say "Veridium is live at $(site)/"
+  echo "(http:// redirects there. It's behind the site password you set.)"
   echo "Next: bash $0 verify   (crash + reboot test)"
 }
 
@@ -137,7 +142,7 @@ cmd_deploy() {
 players() {
   local pw; pw=$(g compute instances describe "$NAME" --zone "$ZONE" --format=json \
     | python3 -c 'import json,sys; m={i["key"]: i.get("value","") for i in json.load(sys.stdin)["metadata"].get("items",[])}; print(m.get("veridium-site-password",""))')
-  curl -fsS --max-time 10 ${pw:+-u "veridium:$pw"} "http://$(ip)/api/players" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))'
+  curl -fsS --max-time 10 ${pw:+-u "veridium:$pw"} "$(site)/api/players" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))'
 }
 
 cmd_verify() {
@@ -158,9 +163,9 @@ cmd_verify() {
 }
 
 cmd_status() {
-  echo "URL: http://$(ip)/"
-  curl -fsS --max-time 5 "http://$(ip)/api/health" && echo || echo "health: not responding"
-  g compute ssh "$NAME" --zone "$ZONE" --command 'systemctl is-active veridium veridium-config; sudo journalctl -u veridium -n 20 --no-pager'
+  echo "URL: $(site)/"
+  curl -fsS --max-time 5 "$(site)/api/health" && echo || echo "health: not responding"
+  g compute ssh "$NAME" --zone "$ZONE" --command 'systemctl is-active veridium veridium-config caddy; sudo journalctl -u veridium -u caddy -n 30 --no-pager'
 }
 
 case "${1:-}" in

@@ -3,9 +3,10 @@
 # instance's `startup-script` metadata), so every step is idempotent:
 #   1. mount the data disk (formatted on first boot) at /var/lib/veridium: the sqlite db lives here
 #   2. add 1 GB of swap (an e2-micro has 1 GB of RAM; npm installs need headroom)
-#   3. install Node.js 22 and git
+#   3. install Node.js 22, git and Caddy (HTTPS in front of the app)
 #   4. clone the repo (first boot only; later deploys go through veridium-deploy)
-#   5. install the services: veridium (the app) and veridium-config (applies setting changes)
+#   5. install the services: veridium (the app, on 127.0.0.1:3000), veridium-config (applies
+#      setting changes) and Caddy (ports 80/443, automatic certificate for <ip>.sslip.io)
 # Settings and secrets come from instance metadata (see deploy/gcp/README.md), never from the repo.
 set -euo pipefail
 exec > >(logger -t veridium-startup) 2>&1
@@ -40,6 +41,7 @@ if ! node --version 2>/dev/null | grep -q '^v22\.'; then
   curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
   apt-get install -y nodejs
 fi
+command -v caddy >/dev/null || { apt-get update -y && apt-get install -y caddy; }   # from Debian's own repos
 
 # ---- 4. App user and code ----
 id veridium >/dev/null 2>&1 || useradd --system --home-dir "$APP" --shell /usr/sbin/nologin veridium
@@ -61,6 +63,6 @@ install -m 644 "$APP/deploy/gcp/veridium.service" /etc/systemd/system/veridium.s
 install -m 644 "$APP/deploy/gcp/veridium-config.service" /etc/systemd/system/veridium-config.service
 /usr/local/bin/veridium-config --once || echo "WARNING: settings not applied (see: journalctl -t veridium-config)" >&2
 systemctl daemon-reload
-systemctl enable --now veridium.service veridium-config.service
-systemctl restart veridium.service       # pick up a fresh env file / code after a reboot or re-run
-echo "Veridium is up on port 80"
+systemctl enable --now veridium.service veridium-config.service caddy.service
+systemctl restart veridium.service caddy.service   # pick up fresh settings / code after a reboot or re-run
+echo "Veridium is up behind Caddy (HTTPS)"
