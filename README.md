@@ -160,6 +160,19 @@ either changes materially, and every account is asked to accept again before any
 login works (the API answers `403` with `code: "terms_required"`). Accounts can be deleted from
 Account settings (password required): that removes the account, its sessions, its applications and
 any org it's the only admin of. Set `CONTACT_EMAIL` to show a contact address on both pages.
+**Recruiting and community.**
+- **Player search:** the Players page filters by game, region, minimum rank, LoL main role, name and
+  "Looking for team", a setting players turn on in Account settings (with optional roles).
+- **Notifications:** a header bell. Org admins hear about new applicants and verification; players
+  hear about decisions and roster changes. Each notification carries only what its recipient may
+  already see.
+- **Org profiles:** a description and website (org admins, in Settings), public roster history, and a
+  "Verified" badge only Veridium staff can grant: accounts whose email is in `ADMIN_EMAILS`.
+- **Follows:** follow players and orgs. Only follower counts are public. The home feed has
+  "Everyone / Following" tabs.
+- **Team history** on the profile's Teams tab, in two tiers: stints on a Veridium org's roster
+  (verified by the org) and self-reported teams (labelled as such).
+
 **Under-18 flag.** Applying shows an optional, self-reported "I am under 18" checkbox (a yes/no,
 never a birthdate). It's stored on that application only (`applications.under_18`) and returned only
 in the org's applicant list (`GET /api/vacancies/:id/applications`, admins), where it shows as an
@@ -217,9 +230,17 @@ their profile.
 | `PATCH /api/applications/:id` | `{ status: accepted \| rejected, addToRoster? = true, role?, rosterStatus? }` |
 | `POST /api/applications/:id/roster` | add an accepted applicant: `{ role? = vacancy role or title, status? = active }` |
 | `GET /api/players/:region/:riotId/applications` | that player only: their applications with vacancy, org and status |
-| `GET /api/players` | every loaded player with verified stats, highest rank first |
+| `GET /api/players?game=&region=&minTier=&role=&lft=1&q=` | player search: every loaded player with verified stats, highest rank first; all filters optional |
+| `PUT /api/auth/me/lft` | `{ lookingForTeam, roles? }` for your own player |
+| `GET /api/notifications` · `POST /api/notifications/read` | your latest notifications and unread count · `{ ids? }` (none: all) |
+| `PATCH /api/organizations/:id` | org admins: `{ description?, website? }` |
+| `POST /api/organizations/:id/verify` | Veridium staff (`ADMIN_EMAILS`): `{ verified }` |
+| `GET /api/organizations/:id/history` | former roster members |
+| `GET` · `PUT` · `DELETE /api/follows/:type/:id` | `type` is `player` (id = PUUID) or `org`: follower count and whether you follow · follow · unfollow |
+| `GET /api/players/:region/:riotId/teams` | team history: `{ veridium, selfReported }` |
+| `POST` · `DELETE /api/players/:region/:riotId/teams[/:id]` | the player's own account: add `{ team, role?, game?, started, ended? }` (YYYY-MM) · remove |
 | `GET /api/players/:region/:riotId/lol` | League of Legends ranked profile for the current season (`?cached=1` for cache only) |
-| `GET /api/feed?limit=` | home feed: TFT and League of Legends sessions (one per player per game per day; LoL remakes left out), roster joins, vacancies |
+| `GET /api/feed?limit=&following=1` | home feed (`following=1`: only players and orgs you follow): TFT and League of Legends sessions (one per player per game per day; LoL remakes left out), roster joins, vacancies |
 
 Players must already be cached by the pipeline (their profile loaded once) before they can be
 rostered or apply. Otherwise the API returns 404. The Org Dashboard and Jobs pages load the

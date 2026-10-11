@@ -254,6 +254,8 @@ describe('deleting an account', () => {
     const cookie = session(await signup({ email: 'kairo@cat.gg', riotId: 'Kairo#NA1' }));
     await request(app).post('/api/organizations').set('Cookie', cookie).send({ name: 'Kairo Gaming' });
     expect((await request(app).post(`/api/vacancies/${vacancy.id}/applications`).set('Cookie', cookie).send({})).status).toBe(201);
+    await request(app).put(`/api/follows/org/${ORG}`).set('Cookie', cookie);
+    await request(app).post('/api/players/na1/Kairo%23NA1/teams').set('Cookie', cookie).send({ team: 'Night Owls', started: '2025-01' });
 
     expect((await request(app).delete('/api/auth/me').set('Cookie', cookie).send({ password: 'wrong-password' })).status).toBe(401);
     const deleted = await request(app).delete('/api/auth/me').set('Cookie', cookie).send({ password: PASSWORD });
@@ -263,6 +265,8 @@ describe('deleting an account', () => {
     expect(store.db.prepare("SELECT COUNT(*) AS n FROM users WHERE email = 'kairo@cat.gg'").get()).toEqual({ n: 0 });
     expect(store.db.prepare('SELECT COUNT(*) AS n FROM sessions').get()).toEqual({ n: 1 }); // only the host's
     expect(store.db.prepare('SELECT COUNT(*) AS n FROM applications').get()).toEqual({ n: 0 });
+    expect(store.db.prepare('SELECT COUNT(*) AS n FROM follows').get()).toEqual({ n: 0 });
+    expect(store.db.prepare('SELECT COUNT(*) AS n FROM team_history').get()).toEqual({ n: 0 });
     expect((await request(app).get('/api/organizations/kairo-gaming')).status).toBe(404);
     expect((await request(app).get(`/api/organizations/${ORG}`)).status).toBe(200); // not theirs to delete
     expect(store.getPlayer(KAIRO)).not.toBeNull(); // public Riot data stays

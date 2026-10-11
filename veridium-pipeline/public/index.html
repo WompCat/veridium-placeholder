@@ -121,7 +121,7 @@
       </div>
       <div class="actions3">
         <a id="shareMatch" href="players.html">🎮 Share match</a>
-        <a href="jobs.html">🤝 Looking for team</a>
+        <a href="login.html" title="Turn on Looking for team so organizations can find you">🤝 Looking for team</a>
         <a href="players.html">🔎 Find players</a>
       </div>
     </section>
@@ -232,9 +232,9 @@
       <div class="me-body">
         <a href="${esc(href)}" class="avatar" style="color:#fff">${esc(p.riotId.charAt(0).toUpperCase())}</a>
         <div class="me-name"><a href="${esc(href)}">${esc(name(p.riotId))}</a> ${VERIFIED}</div>
-        <div class="sub">TFT Player · ${esc(p.region.toUpperCase())} · #${esc(p.riotId.split('#')[1])}</div>
-        <div class="me-rank">${RANK_EMBLEM}<div><b>${esc(rank)}</b><span class="sub">${p.rank ? `${p.rank.leaguePoints} LP · ` : ''}Ranked TFT</span></div></div>
-        <div class="tiles">
+        <div class="sub" id="meSub">TFT Player · ${esc(p.region.toUpperCase())} · #${esc(p.riotId.split('#')[1])}</div>
+        <div class="me-rank" id="meRank">${RANK_EMBLEM}<div><b>${esc(rank)}</b><span class="sub">${p.rank ? `${p.rank.leaguePoints} LP · ` : ''}Ranked TFT</span></div></div>
+        <div class="tiles" id="meTiles">
           <div class="tile"><div class="label">Ranked games</div><div class="value">${p.rankedMatches}</div><div class="sub">${esc(set)}</div></div>
           <div class="tile"><div class="label">Top-4 rate</div><div class="value">${p.totalMatches ? pct(p.winRate) : '–'}</div><div class="sub">${esc(set)}</div></div>
         </div>
@@ -269,6 +269,17 @@
           <span class="game-icon sm muted">LoL</span>
           <div><b>League of Legends</b><div class="sub" style="color:var(--accent)">+ Add your LoL stats</div></div>
         </a>`;
+    // The card leads with the player's main game, like their profile: LoL when it's ranked higher (or TFT is empty).
+    const TIERS = ['IRON', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'EMERALD', 'DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER'];
+    const score = (r) => (r ? TIERS.indexOf(r.tier) * 400 + (['IV', 'III', 'II', 'I'].indexOf(r.division) * 100 || 0) + r.leaguePoints : -1);
+    const tftEmpty = !p.rank && !p.totalMatches;
+    if (!l || !(l.games || l.ranks.solo) || (!tftEmpty && score(l.ranks.solo) <= score(p.rank))) return;
+    const solo = l.ranks.solo;
+    $('meSub').textContent = `League of Legends Player · ${p.region.toUpperCase()} · #${p.riotId.split('#')[1]}`;
+    $('meRank').innerHTML = `${RANK_EMBLEM.replace('#6c63ff', '#c89b3c')}<div><b>${esc(solo ? fmtRank(solo) : 'Unranked')}</b><span class="sub">${solo ? `${solo.leaguePoints} LP · ` : ''}Ranked Solo/Duo</span></div>`;
+    $('meTiles').innerHTML = `
+      <div class="tile"><div class="label">Ranked games</div><div class="value">${l.games}</div><div class="sub">Season ${l.season}</div></div>
+      <div class="tile"><div class="label">Win rate</div><div class="value">${l.games ? pct(l.winRate) : '–'}</div><div class="sub">Season ${l.season}</div></div>`;
   }
 
   // ---- Center: feed ----

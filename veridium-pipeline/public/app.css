@@ -214,7 +214,7 @@
   .legal-doc ul { padding-left: 20px; margin: 8px 0; }
   .legal-doc li { margin: 4px 0; }
   .legal-doc table { width: 100%; min-width: 0; table-layout: fixed; border-collapse: collapse; margin: 10px 0; font-size: 14px; }
-  .legal-doc td, .legal-doc th { overflow-wrap: anywhere; }
+  .legal-doc td, .legal-doc th { white-space: normal; overflow-wrap: anywhere; }
   .legal-doc th, .legal-doc td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
   .legal-doc th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
   .legal-summary { background: var(--accent-soft); border-radius: 14px; padding: 16px 20px; margin: 0 0 8px; }
