@@ -9,6 +9,7 @@ import { config } from './config';
 import { legalInfo } from './legal';
 import { FollowRepo } from './follows';
 import { Notifier } from './notifications';
+import { TeamHistoryRepo } from './teams';
 import { RiotClient } from './riot/client';
 import { OrgRepo } from './orgs/repo';
 import {
@@ -56,7 +57,7 @@ export function createApp(
   const auth = opts.auth ?? new AuthRepo(deps.store.db);
   app.use(sessions(auth));
   app.use('/api/players', playersRouter(deps));
-  const orgDeps = { ...deps, orgs, auth, notifier: new Notifier(deps.store.db), follows: new FollowRepo(deps.store.db), adminEmails: opts.adminEmails ?? config.adminEmails };
+  const orgDeps = { ...deps, orgs, auth, notifier: new Notifier(deps.store.db), follows: new FollowRepo(deps.store.db), teams: new TeamHistoryRepo(deps.store.db), adminEmails: opts.adminEmails ?? config.adminEmails };
   app.use('/api/auth', authRouter(orgDeps));
   app.use('/api/players', playerApplicationsRouter(orgDeps));
   app.use('/api/organizations', organizationsRouter(orgDeps));

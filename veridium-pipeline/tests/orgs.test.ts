@@ -96,6 +96,7 @@ describe('migrations', () => {
       { version: '011_notifications.sql' },
       { version: '012_org_profiles.sql' },
       { version: '013_follows.sql' },
+      { version: '014_team_history.sql' },
     ]);
     const tables = reopened.db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`).all();
     expect(tables.map((t: any) => t.name)).toEqual(
@@ -142,6 +143,36 @@ describe('org profile and verification', () => {
     await api().delete(`/api/organizations/${ORG}/roster/${KAIRO}`);
     const history = (await request(app).get(`/api/organizations/${ORG}/history`)).body;
     expect(history.map((m: any) => [m.player.riotId, m.role, !!m.leftAt])).toEqual([['Kairo#NA1', 'Sub', true]]);
+  });
+});
+
+describe('team history', () => {
+  it('shows Veridium roster stints and self-reported teams; only the player edits theirs', async () => {
+    const url = '/api/players/na1/Kairo%23NA1/teams';
+    const kairo = as(playerCookie(KAIRO));
+    const add = (fields: Record<string, unknown>, who = kairo) => who.post(url).send(fields);
+
+    expect((await request(app).post(url).send({ team: 'X', started: '2025-01' })).status).toBe(401);
+    expect((await add({ team: 'X', started: '2025-01' }, as(playerCookie(PUUID)))).status).toBe(403); // someone else's profile
+    expect((await add({ team: 'X', started: 'Jan 2025' })).status).toBe(400);
+    expect((await add({ team: 'X', started: '2025-06', ended: '2025-01' })).status).toBe(400);
+    expect((await add({ team: 'X', started: '2099-01' })).status).toBe(400);
+    expect((await add({ started: '2025-01' })).status).toBe(400);
+
+    const past = await add({ team: 'Night Owls', role: 'Mid', game: 'LoL', started: '2024-02', ended: '2025-01' });
+    expect(past.status).toBe(201);
+    await add({ team: 'Garage Five', started: '2025-03' }); // still there: no end month
+
+    await api().post(`/api/organizations/${ORG}/roster`).send({ playerPuuid: KAIRO, role: 'Sub' });
+    const teams = (await request(app).get(url)).body; // public
+    expect(teams.veridium).toEqual([expect.objectContaining({ organizationName: 'Obscurity Esports', role: 'Sub', leftAt: null, organizationVerified: false })]);
+    expect(teams.selfReported.map((t: any) => [t.team, t.ended])).toEqual([['Garage Five', null], ['Night Owls', '2025-01']]);
+
+    expect((await as(playerCookie(PUUID)).delete(`${url}/${past.body.id}`)).status).toBe(403);
+    expect((await kairo.delete(`${url}/${past.body.id}`)).status).toBe(204);
+    expect((await kairo.delete(`${url}/${past.body.id}`)).status).toBe(404);
+    expect((await request(app).get(url)).body.selfReported.map((t: any) => t.team)).toEqual(['Garage Five']);
+    expect((await request(app).get('/api/players/na1/Nobody%23NA1/teams')).status).toBe(404);
   });
 });
 

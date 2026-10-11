@@ -14,6 +14,14 @@
   .tabs button.on { color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
   .tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .banner-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .th-head { font-size: 13px; margin: 18px 0 6px; display: flex; align-items: center; gap: 8px; }
+  .th-list { display: grid; gap: 0; }
+  .th-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .th-item:last-child { border-bottom: 0; }
+  .th-item .grow { flex: 1; min-width: 0; }
+  .th-item .when { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .self-pill { background: #f1f2f6; color: var(--muted); border-radius: 999px; padding: 1px 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+  .org-verified { display: inline-flex; align-items: center; gap: 4px; background: #e8f0ff; color: #2f5bd6; border-radius: 999px; padding: 1px 8px; font-size: 11px; font-weight: 700; }
   .ghost { display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,.4); background: rgba(10,12,40,.35); color: #fff; border-radius: 9px; padding: 6px 12px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
   .ghost:hover { background: rgba(10,12,40,.55); }
   .tags { opacity: .85; margin-top: 4px; font-size: 13px; }
@@ -89,7 +97,7 @@
         <button role="tab" data-tab="overview">Overview</button>
         <button role="tab" data-tab="games">Games</button>
         <button role="tab" data-tab="matches">Matches</button>
-        <button role="tab" data-tab="tournaments">Tournaments</button>
+        <button role="tab" data-tab="tournaments">Teams</button>
         <button role="tab" data-tab="stats">Stats</button>
         <button role="tab" data-tab="about">About</button>
       </div>
@@ -208,6 +216,24 @@
     </section>
 
     <!-- Tournaments -->
+    <section class="card pad" data-view="tournaments" hidden>
+      <h2>Team history</h2>
+      <div class="sub">Teams verified by a Veridium organization's roster come first; teams the player added themselves are marked Self-reported.</div>
+      <h3 class="th-head">Verified on Veridium</h3>
+      <div class="th-list" id="teamsVerified"></div>
+      <h3 class="th-head">Self-reported <span class="self-pill">Not verified</span></h3>
+      <div class="th-list" id="teamsSelf"></div>
+      <form class="form-row" id="teamForm" hidden style="margin-top:14px;border-top:1px dashed var(--border);padding-top:14px">
+        <label class="field" style="flex:2 1 180px">Team<input name="team" maxlength="60" required placeholder="Team name" /></label>
+        <label class="field" style="flex:1 1 110px">Role<input name="role" maxlength="40" placeholder="e.g. Mid, Flex" /></label>
+        <label class="field" style="flex:1 1 110px">Game<select name="game"><option value="">—</option><option>TFT</option><option>LoL</option><option>Valorant</option><option>Other</option></select></label>
+        <label class="field" style="flex:1 1 130px">From<input name="started" type="month" required /></label>
+        <label class="field" style="flex:1 1 130px">To<input name="ended" type="month" /></label>
+        <button class="btn primary">Add team</button>
+        <div class="sub" style="flex-basis:100%">Leave "To" empty if you're still on the team. Only add teams you really played for.</div>
+        <div class="form-msg" id="teamMsg" role="alert" style="flex-basis:100%"></div>
+      </form>
+    </section>
     <section class="card pad soon" data-view="tournaments" hidden>
       <div class="icon" aria-hidden="true">🏆</div>
       <h2>Tournament results are coming soon</h2>
@@ -690,6 +716,7 @@
       renderMeButton();
       renderAbout();
       loadOrgCards(p.riotId, p.region); // your own applications become visible
+      loadTeams(p.riotId, p.region);
     } catch (err) {
       notice(err.message, 'error');
       $('thisIsMe').disabled = false;
@@ -866,6 +893,46 @@
     };
   }
 
+  // ---- Team history: Veridium roster stints (verified by the org) and self-reported teams ----
+  const month = (ym) => { const [y, m] = ym.split('-').map(Number); return new Date(y, m - 1).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }); };
+  const span = (from, to) => `${from} – ${to ?? 'present'}`;
+  async function loadTeams(riotId, region) {
+    const path = `/api/players/${encodeURIComponent(region)}/${encodeURIComponent(riotId)}/teams`;
+    const own = isOwnProfile();
+    $('teamForm').hidden = !own;
+    let t;
+    try { t = await fetch(path).then(jsonOrThrow); } catch { return; }
+    $('teamsVerified').innerHTML = t.veridium.length ? t.veridium.map((m) => `<div class="th-item">
+        <div class="grow"><a href="org.html?id=${encodeURIComponent(m.organizationId)}"><b>${esc(m.organizationName)}</b></a>
+          ${m.organizationVerified ? '<span class="org-verified">✔ Verified org</span>' : ''}<div class="sub">${esc(m.role)}</div></div>
+        <span class="when">${esc(span(new Date(m.joinedAt).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }), m.leftAt && new Date(m.leftAt).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })))}</span></div>`).join('')
+      : '<div class="sub">Not on a Veridium organization\'s roster yet.</div>';
+    $('teamsSelf').innerHTML = t.selfReported.length ? t.selfReported.map((s) => `<div class="th-item">
+        <div class="grow"><b>${esc(s.team)}</b><div class="sub">${esc([s.role, s.game].filter(Boolean).join(' · ') || '—')}</div></div>
+        <span class="when">${esc(span(month(s.started), s.ended && month(s.ended)))}</span>
+        ${own ? `<button class="btn small" data-del-team="${esc(s.id)}" aria-label="Remove ${esc(s.team)}">Remove</button>` : ''}</div>`).join('')
+      : `<div class="sub">${own ? 'Add teams you\'ve played for below.' : 'None added.'}</div>`;
+    $('teamsSelf').onclick = async (e) => {
+      const b = e.target.closest('[data-del-team]');
+      if (!b || !confirm('Remove this team from your history?')) return;
+      try { await fetch(`${path}/${encodeURIComponent(b.dataset.delTeam)}`, { method: 'DELETE' }).then((r) => { if (!r.ok) throw new Error('Could not remove it'); }); loadTeams(riotId, region); }
+      catch (err) { notice(err.message, 'error'); }
+    };
+    $('teamForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const f = Object.fromEntries(new FormData(e.target));
+      try {
+        await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.fromEntries(Object.entries(f).filter(([, v]) => v))) }).then(jsonOrThrow);
+        e.target.reset();
+        $('teamMsg').textContent = '';
+        loadTeams(riotId, region);
+      } catch (err) {
+        $('teamMsg').textContent = err.message;
+        $('teamMsg').className = 'form-msg error';
+      }
+    };
+  }
+
   // "Looking for team" lives on the player's account; the directory's summary carries it.
   async function loadLft(riotId, region) {
     try {
@@ -1029,6 +1096,7 @@
         notice(`Showing cached stats. Couldn't refresh from Riot: ${body.error || `HTTP ${res.status}`}`, 'info');
         loadOrgCards(cachedBody.riotId, cachedBody.region);
         loadLft(cachedBody.riotId, cachedBody.region);
+        loadTeams(cachedBody.riotId, cachedBody.region);
         return;
       }
       view.set = body.currentSet;
@@ -1038,6 +1106,7 @@
       loadLolCached();
       loadOrgCards(body.riotId, body.region);
       loadLft(body.riotId, body.region);
+      loadTeams(body.riotId, body.region);
       if (body.history.syncing) pollHistory(riotId, region);
     } catch (err) {
       if (err.api) {

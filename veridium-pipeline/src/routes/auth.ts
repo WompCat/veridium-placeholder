@@ -141,7 +141,10 @@ export function authRouter(deps: AuthDeps): Router {
     if (!full || !(await verifyPassword(password, full.passwordHash))) throw new HttpError(401, 'That password is incorrect.');
     deps.store.db.transaction(() => {
       for (const org of auth.adminOrgs(user.id)) if (org.onlyAdmin) deps.orgs.deleteOrganization(org.id);
-      if (user.playerPuuid) deps.store.db.prepare('DELETE FROM applications WHERE player_puuid = ?').run(user.playerPuuid);
+      if (user.playerPuuid) {
+        deps.store.db.prepare('DELETE FROM applications WHERE player_puuid = ?').run(user.playerPuuid);
+        deps.teams.removeAll(user.playerPuuid); // self-reported teams are theirs; Veridium roster history stays with the orgs
+      }
       auth.deleteUser(user.id);
     })();
     clearSessionCookie(req, res);

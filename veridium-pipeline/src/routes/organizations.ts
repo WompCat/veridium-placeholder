@@ -3,6 +3,7 @@ import { isSiteAdmin, requireLinkedPlayer, requireOrgAdmin, requireUser } from '
 import type { AuthRepo } from '../auth/repo';
 import type { FollowRepo, FollowTarget } from '../follows';
 import type { Notifier } from '../notifications';
+import type { TeamHistoryRepo } from '../teams';
 import { buildFeed, listPlayerSummaries } from '../feed';
 import { parsePlayerFilters, searchPlayers } from '../players/search';
 import { badRequest, conflict, forbidden, HttpError, notFound } from '../orgs/errors';
@@ -19,6 +20,7 @@ export interface OrgDeps extends IngestDeps {
   auth: AuthRepo;
   notifier: Notifier;
   follows: FollowRepo;
+  teams: TeamHistoryRepo;
   /** Veridium staff emails (ADMIN_EMAILS): they can verify organizations. */
   adminEmails: string[];
 }
@@ -341,6 +343,40 @@ export function playerApplicationsRouter(deps: OrgDeps): Router {
   // The directory and player search: ?game=tft|lol&region=&minTier=&role=&lft=1&q=
   router.get('/', (req, res) => {
     res.json(searchPlayers(listPlayerSummaries(deps), parsePlayerFilters(req.query as Record<string, unknown>)));
+  });
+
+  const playerFromParams = (req: Request) => {
+    const { gameName, tagLine } = parseRiotId(String(req.params.riotId));
+    const player = deps.store.findPlayer(gameName, tagLine, String(req.params.region));
+    if (!player) throw notFound('Player not loaded yet');
+    return player;
+  };
+
+  // Team history, public: roster stints on Veridium (verified by the org) and self-reported teams.
+  router.get('/:region/:riotId/teams', (req, res) => {
+    res.json(deps.teams.forPlayer(playerFromParams(req).puuid));
+  });
+
+  // Self-reported teams: only the player's own account adds or removes them.
+  router.post('/:region/:riotId/teams', (req, res) => {
+    const player = playerFromParams(req);
+    if (requireUser(req).playerPuuid !== player.puuid) throw forbidden('You can only edit your own team history.');
+    const b = body(req);
+    const entry = deps.teams.add(player.puuid, {
+      team: text(b, 'team', { required: true, max: 60 }),
+      role: text(b, 'role', { max: 40 }) ?? null,
+      game: text(b, 'game', { max: 40 }) ?? null,
+      started: text(b, 'started', { required: true, max: 7 }),
+      ended: text(b, 'ended', { max: 7 }) ?? null,
+    });
+    res.status(201).json(entry);
+  });
+
+  router.delete('/:region/:riotId/teams/:id', (req, res) => {
+    const player = playerFromParams(req);
+    if (requireUser(req).playerPuuid !== player.puuid) throw forbidden('You can only edit your own team history.');
+    deps.teams.remove(player.puuid, String(req.params.id));
+    res.status(204).end();
   });
 
   // A player's applications and their outcomes are visible to that player only.
