@@ -7,12 +7,14 @@ import { AuthRepo } from './auth/repo';
 import { Store } from './cache/store';
 import { config } from './config';
 import { legalInfo } from './legal';
+import { Notifier } from './notifications';
 import { RiotClient } from './riot/client';
 import { OrgRepo } from './orgs/repo';
 import {
   applicationsRouter,
   errorHandler,
   feedRouter,
+  notificationsRouter,
   organizationsRouter,
   playerApplicationsRouter,
   vacanciesRouter,
@@ -52,13 +54,14 @@ export function createApp(
   const auth = opts.auth ?? new AuthRepo(deps.store.db);
   app.use(sessions(auth));
   app.use('/api/players', playersRouter(deps));
-  const orgDeps = { ...deps, orgs, auth };
+  const orgDeps = { ...deps, orgs, auth, notifier: new Notifier(deps.store.db) };
   app.use('/api/auth', authRouter(orgDeps));
   app.use('/api/players', playerApplicationsRouter(orgDeps));
   app.use('/api/organizations', organizationsRouter(orgDeps));
   app.use('/api/vacancies', vacanciesRouter(orgDeps));
   app.use('/api/applications', applicationsRouter(orgDeps));
   app.use('/api/feed', feedRouter(orgDeps));
+  app.use('/api/notifications', notificationsRouter(orgDeps));
   app.get('/api/legal', (_req, res) => {
     res.json(legalInfo());
   });

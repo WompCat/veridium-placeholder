@@ -1,6 +1,7 @@
 import { Router, type ErrorRequestHandler, type Request } from 'express';
 import { requireLinkedPlayer, requireOrgAdmin, requireUser } from '../auth/http';
 import type { AuthRepo } from '../auth/repo';
+import type { Notifier } from '../notifications';
 import { buildFeed, listPlayerSummaries } from '../feed';
 import { parsePlayerFilters, searchPlayers } from '../players/search';
 import { badRequest, conflict, forbidden, HttpError, notFound } from '../orgs/errors';
@@ -15,6 +16,7 @@ import type { MembershipStatus, PlayerSummary, VacancyLevel, VacancyStatus } fro
 export interface OrgDeps extends IngestDeps {
   orgs: OrgRepo;
   auth: AuthRepo;
+  notifier: Notifier;
 }
 
 const MEMBERSHIP_STATUSES: MembershipStatus[] = ['active', 'bench'];
@@ -138,6 +140,7 @@ export function organizationsRouter(deps: OrgDeps): Router {
       text(b, 'role', { required: true, max: 40 }),
       oneOf(b, 'status', MEMBERSHIP_STATUSES) ?? 'active',
     );
+    deps.notifier.rosterAdded(membership.organizationId, puuid, membership.role);
     res.status(201).json({ ...membership, player: summary(deps, puuid) });
   });
 
@@ -155,7 +158,9 @@ export function organizationsRouter(deps: OrgDeps): Router {
 
   router.delete('/:id/roster/:playerPuuid', (req, res) => {
     adminOf(req);
-    res.json(orgs.removeMember(req.params.id, req.params.playerPuuid));
+    const removed = orgs.removeMember(req.params.id, req.params.playerPuuid);
+    deps.notifier.rosterRemoved(removed.organizationId, removed.playerPuuid);
+    res.json(removed);
   });
 
   // Vacancies for one org (all statuses).
@@ -225,6 +230,8 @@ export function vacanciesRouter(deps: OrgDeps): Router {
   router.post('/:id/applications', (req, res) => {
     const puuid = requireLinkedPlayer(req);
     const application = orgs.createApplication(req.params.id, puuid, flag(body(req), 'under18') ?? false);
+    const vacancy = orgs.requireVacancy(application.vacancyId);
+    deps.notifier.applicationReceived(vacancy.organizationId, vacancy.title, puuid); // never includes the under-18 flag
     res.status(201).json({ ...application, player: summary(deps, puuid) });
   });
 
@@ -268,6 +275,8 @@ export function applicationsRouter(deps: OrgDeps): Router {
       role: text(b, 'role', { max: 40 }),
       status: oneOf(b, 'rosterStatus', MEMBERSHIP_STATUSES),
     });
+    const vacancy = orgs.requireVacancy(result.application.vacancyId);
+    deps.notifier.applicationDecided(vacancy.organizationId, vacancy.title, result.application.playerPuuid, decision, !!result.membership);
     res.json(result);
   });
 
@@ -279,6 +288,7 @@ export function applicationsRouter(deps: OrgDeps): Router {
       role: text(b, 'role', { max: 40 }),
       status: oneOf(b, 'status', MEMBERSHIP_STATUSES),
     });
+    deps.notifier.rosterAdded(membership.organizationId, membership.playerPuuid, membership.role);
     res.status(201).json({ ...membership, player: summary(deps, membership.playerPuuid) });
   });
 
@@ -303,6 +313,29 @@ export function playerApplicationsRouter(deps: OrgDeps): Router {
     if (!player) return void res.json([]);
     if (player.puuid !== user.playerPuuid) throw forbidden('Applications are private to the player.');
     res.json(deps.orgs.listPlayerApplications(player.puuid));
+  });
+
+  router.use(errorHandler);
+  return router;
+}
+
+/** /api/notifications: the logged-in account's notifications. */
+export function notificationsRouter(deps: OrgDeps): Router {
+  const router = Router();
+
+  router.get('/', (req, res) => {
+    res.json(deps.notifier.list(requireUser(req).id));
+  });
+
+  // { ids: [...] } marks those as read; no ids marks everything read.
+  router.post('/read', (req, res) => {
+    const user = requireUser(req);
+    const ids = body(req).ids;
+    if (ids !== undefined && (!Array.isArray(ids) || ids.length > 100 || !ids.every((i) => typeof i === 'string'))) {
+      throw badRequest('"ids" must be a list of notification ids');
+    }
+    deps.notifier.markRead(user.id, ids as string[] | undefined);
+    res.json(deps.notifier.list(user.id));
   });
 
   router.use(errorHandler);

@@ -12,6 +12,7 @@
     tournaments: '<path d="M8 4h8v5a4 4 0 0 1-8 0zM8 5H4v2a3 3 0 0 0 4 3M16 5h4v2a3 3 0 0 1-4 3M12 13v4M8 21h8M9 17h6"/>',
     jobs: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18"/>',
     search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+    bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
   };
   const NAV = [
     ['home', 'Home', '/'],
@@ -145,6 +146,54 @@
   const playerHref = (riotId, region) =>
     `player.html?riotId=${encodeURIComponent(riotId)}&region=${encodeURIComponent(region)}`;
 
+  // ---- Notifications (bell) ----
+  let notes = { unread: 0, items: [] };
+  const ago = (iso) => {
+    const s = Math.max(0, (Date.now() - new Date(iso)) / 1000);
+    if (s < 60) return 'just now';
+    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+    return `${Math.floor(s / 86400)}d ago`;
+  };
+  async function loadNotes() {
+    const account = getAccount();
+    if (!account || account.termsAccepted === false) return;
+    try {
+      const res = await fetch('/api/notifications');
+      if (res.ok) { notes = await res.json(); renderBell(); }
+    } catch {}
+  }
+  async function markRead(ids) {
+    try {
+      const res = await fetch('/api/notifications/read', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(ids ? { ids } : {}),
+      });
+      if (res.ok) { notes = await res.json(); renderBell(); }
+    } catch {}
+  }
+  function bellButton() {
+    return `<div class="bell-wrap">
+      <button class="bell" id="bellBtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="bellMenu" aria-label="Notifications">
+        ${icon('bell')}<span class="bell-count" id="bellCount" hidden></span></button>
+      <div class="bell-menu" id="bellMenu" role="dialog" aria-label="Notifications" hidden>
+        <div class="bell-head"><b>Notifications</b><button type="button" id="markAll">Mark all read</button></div>
+        <div class="bell-list" id="bellList"></div>
+      </div>
+    </div>`;
+  }
+  function renderBell() {
+    const count = document.getElementById('bellCount');
+    if (!count) return;
+    count.hidden = !notes.unread;
+    count.textContent = notes.unread > 9 ? '9+' : String(notes.unread);
+    document.getElementById('bellBtn').setAttribute('aria-label', notes.unread ? `Notifications, ${notes.unread} unread` : 'Notifications');
+    document.getElementById('markAll').hidden = !notes.unread;
+    document.getElementById('bellList').innerHTML = notes.items.length
+      ? notes.items.map((n) => `<a href="${escape(n.link)}" data-note="${escape(n.id)}" class="${n.read ? '' : 'unread'}">
+          <span>${escape(n.text)}</span><small>${ago(n.createdAt)}</small></a>`).join('')
+      : '<div class="bell-empty">You\'re all caught up. Applications, decisions and roster changes show up here.</div>';
+  }
+
   function accountMenu(account) {
     const me = getMe();
     const label = me ? me.riotId : account.email;
@@ -184,7 +233,7 @@
         ${NAV.map(([key, label, href]) => `<a href="${href}" title="${label}" class="${key === page ? 'active' : ''}" ${key === page ? 'aria-current="page"' : ''}>${icon(key)}<span>${label}</span></a>`).join('')}
       </nav>
       ${account
-        ? accountMenu(account)
+        ? (account.termsAccepted === false ? '' : bellButton()) + accountMenu(account)
         : page === 'login'
           ? ''
           : `<div class="header-ctas"><a class="btn" href="${escape(loginHref())}">Log in</a><a class="btn primary" href="${escape(loginHref('signup'))}">Sign up</a></div>`}`;
@@ -194,12 +243,43 @@
       if (!term) return;
       location.href = term.includes('#') ? playerHref(term, getMe()?.region ?? 'na1') : `players.html?q=${encodeURIComponent(term)}`;
     });
+    const bell = document.getElementById('bellBtn');
+    if (bell) {
+      const menu = document.getElementById('bellMenu');
+      renderBell();
+      bell.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const open = menu.hidden;
+        closeMenu(); // also closes the account menu
+        menu.hidden = !open;
+        bell.setAttribute('aria-expanded', String(open));
+        if (open) loadNotes();
+      });
+      document.getElementById('markAll').addEventListener('click', (e) => { e.stopPropagation(); markRead(); });
+      document.getElementById('bellList').addEventListener('click', (e) => {
+        const a = e.target.closest('a[data-note]');
+        if (!a) return;
+        const n = notes.items.find((x) => x.id === a.dataset.note);
+        if (n && !n.read) {
+          e.preventDefault();
+          markRead([n.id]).finally(() => { location.href = a.href; });
+        }
+      });
+    }
     const btn = document.getElementById('meBtn');
     if (btn) {
       const menu = document.getElementById('meMenu');
       closeMenu = () => { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
+      const closeAccount = closeMenu;
+      const closeBell = () => {
+        const bm = document.getElementById('bellMenu');
+        if (bm) { bm.hidden = true; document.getElementById('bellBtn').setAttribute('aria-expanded', 'false'); }
+      };
+      closeMenu = () => { closeAccount(); closeBell(); };
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
+        const bm = document.getElementById('bellMenu');
+        if (bm) { bm.hidden = true; document.getElementById('bellBtn').setAttribute('aria-expanded', 'false'); }
         menu.hidden = !menu.hidden;
         btn.setAttribute('aria-expanded', String(!menu.hidden));
         if (!menu.hidden) menu.querySelector('a, button')?.focus();
@@ -208,12 +288,15 @@
     }
   }
   // Registered once: clicking elsewhere or Escape closes the account menu.
-  document.addEventListener('click', (e) => { if (!e.target.closest?.('.me-wrap')) closeMenu(); });
+  document.addEventListener('click', (e) => { if (!e.target.closest?.('.me-wrap, .bell-wrap')) closeMenu(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
 
   // `ready` resolves to the server's view of the account; pages that gate on login await it.
   window.Veridium = { getAccount, getMe, refreshAccount, signedIn, logout, loginHref, playerHref };
   window.Veridium.ready = refreshAccount();
+  window.Veridium.ready.then(loadNotes);
+  // Check for new notifications every minute while the tab is visible.
+  setInterval(() => { if (document.visibilityState === 'visible') loadNotes(); }, 60_000);
   const start = () => { render(); footer(); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
   else start();

@@ -243,3 +243,24 @@
   .apply-confirm .u18 { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.5; cursor: pointer; }
   .apply-confirm .u18 input { width: 17px; height: 17px; margin: 2px 0 0; accent-color: var(--accent); flex: 0 0 17px; }
   .apply-confirm-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* ---- Notifications bell (shell.js) ---- */
+  .bell-wrap { position: relative; flex: none; margin-left: auto; }
+  .bell-wrap + .me-wrap { margin-left: 12px; }
+  .bell { position: relative; width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--border); background: var(--card); color: var(--muted); display: grid; place-items: center; cursor: pointer; }
+  .bell:hover, .bell[aria-expanded="true"] { color: var(--accent); border-color: #c7cbff; }
+  .bell:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .bell svg { width: 19px; height: 19px; }
+  .bell-count { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--bad); color: #fff; font-size: 11px; font-weight: 700; display: grid; place-items: center; box-shadow: 0 0 0 2px var(--card); }
+  .bell-menu { position: absolute; right: 0; top: calc(100% + 10px); z-index: 50; width: min(360px, calc(100vw - 32px)); background: var(--card); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 12px 32px rgba(17, 20, 70, .14); overflow: hidden; }
+  .bell-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  .bell-head button { border: 0; background: none; color: var(--accent); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .bell-list { max-height: 380px; overflow-y: auto; }
+  .bell-list a { display: grid; gap: 2px; padding: 11px 14px 11px 24px; border-bottom: 1px solid var(--border); color: var(--text); font-size: 13px; line-height: 1.45; position: relative; }
+  .bell-list a:last-child { border-bottom: 0; }
+  .bell-list a:hover { background: var(--bg); }
+  .bell-list a.unread { background: var(--accent-soft); }
+  .bell-list a.unread::before { content: ""; position: absolute; left: 10px; top: 17px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+  .bell-list small { color: var(--muted); font-size: 11px; }
+  .bell-empty { padding: 22px 16px; color: var(--muted); font-size: 13px; text-align: center; line-height: 1.5; }
+  @media (max-width: 640px) { .bell-wrap { margin-left: auto; } .bell-wrap + .me-wrap { margin-left: 8px; } .bell-menu { position: fixed; left: 16px; right: 16px; top: 64px; width: auto; } }

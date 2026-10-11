@@ -93,6 +93,7 @@ describe('migrations', () => {
       { version: '008_terms.sql' },
       { version: '009_under_18_flag.sql' },
       { version: '010_looking_for_team.sql' },
+      { version: '011_notifications.sql' },
     ]);
     const tables = reopened.db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`).all();
     expect(tables.map((t: any) => t.name)).toEqual(
@@ -256,6 +257,44 @@ describe('applications: the player ↔ org loop', () => {
       (await api().get('/api/vacancies')).body,
     ];
     for (const body of elsewhere) expect(JSON.stringify(body)).not.toMatch(/under.?18/i);
+  });
+
+  it('notifies the org about applicants and the player about outcomes, and nobody else', async () => {
+    const v = await postVacancy();
+    const texts = async (cookie: string) => (await as(cookie).get('/api/notifications')).body;
+    expect((await request(app).get('/api/notifications')).status).toBe(401);
+
+    const appId = (await apply(v.id, KAIRO, { under18: true })).body.id;
+    const forAdmin = await texts(adminCookie);
+    expect(forAdmin.unread).toBe(1);
+    expect(forAdmin.items).toEqual([
+      expect.objectContaining({ type: 'application.received', text: 'Kairo applied to Flex Player.', link: `org.html?id=${ORG}#vacancies`, read: false }),
+    ]);
+    expect(JSON.stringify(forAdmin)).not.toMatch(/under|18/i); // the flag stays on the application
+
+    await api().patch(`/api/applications/${appId}`).send({ status: 'accepted' });
+    const forKairo = await texts(playerCookie(KAIRO));
+    expect(forKairo.items.map((n: any) => [n.type, n.text])).toEqual([
+      ['application.accepted', 'Obscurity Esports accepted your application for Flex Player and added you to the roster.'],
+    ]);
+    expect(forKairo.items[0].link).toBe('player.html?riotId=Kairo%23NA1&region=na1#applications');
+    expect((await texts(playerCookie(PUUID))).items).toEqual([]); // other players hear nothing
+
+    // Roster changes made directly by the org.
+    await api().post(`/api/organizations/${ORG}/roster`).send({ playerPuuid: PUUID, role: 'Sub' });
+    await api().delete(`/api/organizations/${ORG}/roster/${PUUID}`);
+    expect((await texts(playerCookie(PUUID))).items.map((n: any) => n.text)).toEqual([
+      'Obscurity Esports removed you from its roster.',
+      'Obscurity Esports added you to its roster as Sub.',
+    ]);
+
+    // Reading: per account, by id or all at once.
+    const mine = await texts(playerCookie(PUUID));
+    await as(playerCookie(KAIRO)).post('/api/notifications/read').send({ ids: [mine.items[0].id] }); // not Kairo's: no effect
+    expect((await texts(playerCookie(PUUID))).unread).toBe(2);
+    expect((await as(playerCookie(PUUID)).post('/api/notifications/read').send({ ids: [mine.items[0].id] })).body.unread).toBe(1);
+    expect((await as(playerCookie(PUUID)).post('/api/notifications/read').send({})).body.unread).toBe(0);
+    expect((await as(playerCookie(PUUID)).post('/api/notifications/read').send({ ids: 'all' })).status).toBe(400);
   });
 
   it('accepting adds the player to the roster', async () => {
