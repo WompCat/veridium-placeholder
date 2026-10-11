@@ -1,0 +1,17 @@
+// GitHub Codespaces / dev container setup for Veridium: Node 22, dependencies installed on creation,
+// the app's port forwarded, and RIOT_API_KEY offered as a Codespaces secret. See README "Codespaces".
+{
+  "name": "Veridium",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "postCreateCommand": "cd veridium-pipeline && npm ci",
+  "forwardPorts": [4000],
+  "portsAttributes": {
+    "4000": { "label": "Veridium", "onAutoForward": "notify" }
+  },
+  "secrets": {
+    "RIOT_API_KEY": {
+      "description": "Your Riot Games development API key (RGAPI-…). It expires every 24 hours; update it in GitHub → Settings → Codespaces.",
+      "documentationUrl": "https://developer.riotgames.com"
+    }
+  }
+}

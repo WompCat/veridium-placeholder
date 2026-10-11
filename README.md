@@ -25,6 +25,13 @@ npm run dev                 # http://localhost:4000/  (home)
 Riot development keys expire every 24 hours, so regenerate yours at
 <https://developer.riotgames.com> and update `.env` when requests start returning 401/403.
 
+### In GitHub Codespaces
+
+`.devcontainer/devcontainer.json` sets up Node 22, runs `npm ci` and forwards port 4000. On the repo's
+GitHub page: **Code → Codespaces → Create codespace on main**. Add your key as a Codespaces secret
+named `RIOT_API_KEY` (GitHub → Settings → Codespaces), then in the Codespace terminal:
+`cd veridium-pipeline && npm run dev`, and open the forwarded port 4000.
+
 ### In a Claude Code cloud session
 
 The environment's network proxy injects the Riot key, so no real key lives in the container. Node's
