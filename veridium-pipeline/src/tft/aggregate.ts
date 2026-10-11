@@ -9,7 +9,7 @@ import type {
   SeasonStats,
 } from '../types';
 
-const TIERS = ['IRON', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'EMERALD', 'DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER'];
+export const TIERS = ['IRON', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'EMERALD', 'DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER'];
 const DIVISIONS = ['IV', 'III', 'II', 'I'];
 const APEX_START = TIERS.indexOf('MASTER');
 

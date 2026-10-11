@@ -196,6 +196,19 @@ export class LolStore {
     return row;
   }
 
+  /** The role this player has played most this season (Riot's teamPosition), or null. */
+  mainRole(puuid: string, season: number): string | null {
+    const row = this.db
+      .prepare(
+        `SELECT p.role, COUNT(*) AS n
+         FROM lol_participants p JOIN lol_matches m ON m.match_id = p.match_id
+         WHERE p.puuid = ? AND m.season = ? AND m.remake = 0 AND p.role <> ''
+         GROUP BY p.role ORDER BY n DESC, p.role LIMIT 1`,
+      )
+      .get(puuid, season) as { role: string } | undefined;
+    return row?.role ?? null;
+  }
+
   /** Whether Veridium has any LoL data for this player (they've been loaded for LoL at least once). */
   hasPlayer(puuid: string): boolean {
     return !!this.db.prepare('SELECT 1 FROM lol_sync WHERE puuid = ?').get(puuid);

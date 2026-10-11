@@ -29,6 +29,8 @@ function accountView(deps: AuthDeps, user: User) {
     player: player ? { puuid: player.puuid, riotId: `${player.gameName}#${player.tagLine}`, region: player.region } : null,
     adminOf: deps.auth.adminOrgs(user.id),
     termsAccepted: user.termsVersion === TERMS_VERSION,
+    lookingForTeam: user.lookingForTeam,
+    lftRoles: user.lftRoles,
     termsAcceptedAt: user.termsAcceptedAt,
   };
 }
@@ -143,6 +145,16 @@ export function authRouter(deps: AuthDeps): Router {
     })();
     clearSessionCookie(req, res);
     res.status(204).end();
+  });
+
+  // "Looking for team" for the account's player: { lookingForTeam: boolean, roles?: "Flex, Sub" }.
+  router.put('/me/lft', (req, res) => {
+    const user = requireUser(req);
+    if (!user.playerPuuid) throw new HttpError(403, 'Link your Riot ID first, so orgs can see who is looking.');
+    const b = body(req);
+    if (typeof b.lookingForTeam !== 'boolean') throw badRequest('"lookingForTeam" must be true or false');
+    const roles = str(b, 'roles').slice(0, 60) || null;
+    res.json({ user: accountView(deps, auth.setLookingForTeam(user.id, b.lookingForTeam, roles)) });
   });
 
   // Link a Riot ID to the account, or unlink with { riotId: null }.

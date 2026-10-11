@@ -41,8 +41,8 @@
   function cacheAccount(user) {
     try {
       if (user) {
-        const { email, player, adminOf, termsAccepted } = user;
-        localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ email, player, adminOf, termsAccepted }));
+        const { email, player, adminOf, termsAccepted, lookingForTeam, lftRoles } = user;
+        localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ email, player, adminOf, termsAccepted, lookingForTeam, lftRoles }));
       }
       else localStorage.removeItem(ACCOUNT_KEY);
     } catch {}

@@ -205,6 +205,25 @@ describe('permissions', () => {
   });
 });
 
+describe('looking for team', () => {
+  it('lets a player opt in from their account, which the player search can filter on', async () => {
+    const recruiter = session(await signup({ email: 'recruiter@cat.gg' }));
+    expect((await request(app).put('/api/auth/me/lft').set('Cookie', recruiter).send({ lookingForTeam: true })).status).toBe(403); // no Riot ID
+
+    const kairo = session(await signup({ email: 'kairo@cat.gg', riotId: 'Kairo#NA1' }));
+    expect((await request(app).put('/api/auth/me/lft').send({ lookingForTeam: true })).status).toBe(401);
+    expect((await request(app).put('/api/auth/me/lft').set('Cookie', kairo).send({ lookingForTeam: 'yes' })).status).toBe(400);
+    const on = await request(app).put('/api/auth/me/lft').set('Cookie', kairo).send({ lookingForTeam: true, roles: 'Flex, Sub' });
+    expect(on.body.user).toMatchObject({ lookingForTeam: true, lftRoles: 'Flex, Sub' });
+
+    const lft = (await request(app).get('/api/players?lft=1')).body;
+    expect(lft.map((p: any) => [p.riotId, p.lookingForTeam])).toEqual([['Kairo#NA1', { roles: 'Flex, Sub' }]]);
+
+    await request(app).put('/api/auth/me/lft').set('Cookie', kairo).send({ lookingForTeam: false });
+    expect((await request(app).get('/api/players?lft=1')).body).toEqual([]);
+  });
+});
+
 describe('terms of service and privacy policy', () => {
   it('serves the current version, and asks accounts on an older one to accept before doing anything', async () => {
     expect((await request(app).get('/api/legal')).body).toEqual({ termsVersion: TERMS_VERSION, contactEmail: null });

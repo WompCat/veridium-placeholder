@@ -72,6 +72,7 @@
           </h1>
           <div class="meta" id="meta">TFT Player</div>
           <div class="tags" id="tags">Competitive · Ranked TFT · Verified by Riot</div>
+          <div id="lftBadge" hidden style="margin-top:8px"><span style="display:inline-block;background:#e7f7ee;color:#137a3e;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700"></span></div>
           <div class="banner-actions">
             <button class="ghost" id="share" type="button">🔗 Share Profile</button>
             <button class="ghost" id="thisIsMe" type="button">⭐ This is me</button>
@@ -835,6 +836,16 @@
     return !!(me && view.profile && me.riotId.toLowerCase() === view.profile.riotId.toLowerCase() && me.region === view.profile.region);
   }
 
+  // "Looking for team" lives on the player's account; the directory's summary carries it.
+  async function loadLft(riotId, region) {
+    try {
+      const list = await fetch(`/api/players?q=${encodeURIComponent(riotId.split('#')[0])}&region=${encodeURIComponent(region)}`).then(jsonOrThrow);
+      const p = list.find((x) => x.riotId.toLowerCase() === riotId.toLowerCase());
+      $('lftBadge').hidden = !p?.lookingForTeam;
+      if (p?.lookingForTeam) $('lftBadge').firstElementChild.textContent = `Looking for team${p.lookingForTeam.roles ? ` · ${p.lookingForTeam.roles}` : ''}`;
+    } catch {}
+  }
+
   async function loadOrgCards(riotId, region) {
     const playerPath = `/api/players/${encodeURIComponent(region)}/${encodeURIComponent(riotId)}`;
     try {
@@ -986,6 +997,7 @@
         loadLolCached();
         notice(`Showing cached stats. Couldn't refresh from Riot: ${body.error || `HTTP ${res.status}`}`, 'info');
         loadOrgCards(cachedBody.riotId, cachedBody.region);
+        loadLft(cachedBody.riotId, cachedBody.region);
         return;
       }
       view.set = body.currentSet;
@@ -994,6 +1006,7 @@
       historyNotice(body);
       loadLolCached();
       loadOrgCards(body.riotId, body.region);
+      loadLft(body.riotId, body.region);
       if (body.history.syncing) pollHistory(riotId, region);
     } catch (err) {
       if (err.api) {

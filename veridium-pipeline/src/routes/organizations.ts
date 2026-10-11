@@ -2,6 +2,7 @@ import { Router, type ErrorRequestHandler, type Request } from 'express';
 import { requireLinkedPlayer, requireOrgAdmin, requireUser } from '../auth/http';
 import type { AuthRepo } from '../auth/repo';
 import { buildFeed, listPlayerSummaries } from '../feed';
+import { parsePlayerFilters, searchPlayers } from '../players/search';
 import { badRequest, conflict, forbidden, HttpError, notFound } from '../orgs/errors';
 import { playerSummary } from '../orgs/players';
 import { slugify, type NewVacancy, type OrgRepo, type VacancyPatch } from '../orgs/repo';
@@ -289,8 +290,9 @@ export function applicationsRouter(deps: OrgDeps): Router {
 export function playerApplicationsRouter(deps: OrgDeps): Router {
   const router = Router();
 
-  router.get('/', (_req, res) => {
-    res.json(listPlayerSummaries(deps));
+  // The directory and player search: ?game=tft|lol&region=&minTier=&role=&lft=1&q=
+  router.get('/', (req, res) => {
+    res.json(searchPlayers(listPlayerSummaries(deps), parsePlayerFilters(req.query as Record<string, unknown>)));
   });
 
   // A player's applications and their outcomes are visible to that player only.

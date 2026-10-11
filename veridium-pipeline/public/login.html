@@ -128,6 +128,14 @@
           </form>
         </div>
         <dl class="account-rows" id="accountRows"></dl>
+        <form class="linkbox" id="lftForm" hidden>
+          <label class="agree" style="font-size:14px"><input type="checkbox" name="lookingForTeam" />
+            <span><b>Looking for team</b><br><span class="sub">Shows a badge on your profile and lets organizations find you in the player search.</span></span></label>
+          <label class="field" style="margin-top:10px">Roles you want <span class="optional">(optional)</span>
+            <input name="roles" maxlength="60" placeholder="e.g. Flex, Sub, Support" style="border:1px solid var(--border);border-radius:9px;padding:9px 12px;font:inherit" /></label>
+          <button class="btn primary" style="margin-top:10px">Save</button>
+          <div class="form-msg" id="lftMsg" role="status"></div>
+        </form>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <a class="btn primary" id="continueBtn" href="/">Continue</a>
           <a class="btn" href="organizations.html#create">Create an organization</a>
@@ -261,11 +269,25 @@
       ...soleOrgs.map((o) => `<b>${esc(o.name)}</b>, since you're its only admin (roster, vacancies and applicants)`),
     ].filter(Boolean).map((x) => `<li>${x}</li>`).join('');
     $('accountRows').innerHTML = rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
+    $('lftForm').hidden = !me;
+    $('lftForm').lookingForTeam.checked = !!account.lookingForTeam;
+    $('lftForm').roles.value = account.lftRoles ?? '';
     $('continueBtn').href = destination(account);
     $('continueBtn').textContent = nextUrl ? 'Continue' : me ? 'Go to my profile' : 'Go to home';
     if (location.hash === '#link' && !me) $('linkForm').riotId.focus();
   }
   $('logoutBtn2').addEventListener('click', () => Veridium.logout());
+
+  $('lftForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      const { user } = await api('/api/auth/me/lft', { method: 'PUT', body: { lookingForTeam: e.target.lookingForTeam.checked, roles: e.target.roles.value.trim() } });
+      Veridium.signedIn(user);
+      setMsg($('lftMsg'), user.lookingForTeam ? 'Saved: organizations can now find you.' : 'Saved: you\'re no longer listed as looking.', 'ok');
+    } catch (err) {
+      setMsg($('lftMsg'), err.message, 'error');
+    }
+  });
 
   $('deleteForm').addEventListener('submit', async (e) => {
     e.preventDefault();

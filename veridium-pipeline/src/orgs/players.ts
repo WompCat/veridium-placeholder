@@ -8,12 +8,22 @@ function lolSummary(deps: IngestDeps, puuid: string): PlayerSummary['lol'] {
   const lol = new LolStore(deps.store.db);
   if (!lol.hasPlayer(puuid)) return null;
   const solo = lol.latestRank(puuid, 'RANKED_SOLO_5x5');
-  const { games, wins } = lol.seasonRecord(puuid, seasonOf((deps.now ?? Date.now)()));
+  const season = seasonOf((deps.now ?? Date.now)());
+  const { games, wins } = lol.seasonRecord(puuid, season);
   return {
     soloRank: solo ? { tier: solo.tier, division: solo.division, leaguePoints: solo.leaguePoints } : null,
     games,
     winRate: games ? Math.round((wins / games) * 1000) / 1000 : 0,
+    mainRole: lol.mainRole(puuid, season),
   };
+}
+
+/** The player's own "Looking for team" setting, from the account linked to them (if any). */
+function lookingForTeam(deps: IngestDeps, puuid: string): PlayerSummary['lookingForTeam'] {
+  const row = deps.store.db
+    .prepare('SELECT looking_for_team, lft_roles FROM users WHERE player_puuid = ?')
+    .get(puuid) as { looking_for_team: number; lft_roles: string | null } | undefined;
+  return row?.looking_for_team ? { roles: row.lft_roles } : null;
 }
 
 function bestRank(tft: RankEntry | null, lol: RankEntry | null): PlayerSummary['bestRank'] {
@@ -43,5 +53,6 @@ export function playerSummary(deps: IngestDeps, puuid: string): PlayerSummary | 
     avgPlacement: p.avgPlacement,
     lol,
     bestRank: bestRank(p.rank, lol?.soloRank ?? null),
+    lookingForTeam: lookingForTeam(deps, puuid),
   };
 }

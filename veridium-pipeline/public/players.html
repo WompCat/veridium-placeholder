@@ -21,6 +21,13 @@
   .pcard .nums b { display: block; font-size: 15px; color: var(--text); }
   .pcard .nums .best b { color: var(--accent); }
   .pcard .nums .best-tag { margin-left: 4px; padding: 0 5px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+  .filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+  .filters select { width: 100%; border: 1px solid var(--border); background: var(--bg); border-radius: 10px; padding: 9px 10px; font: inherit; font-size: 13px; }
+  .filters-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; font-size: 13px; }
+  .filters-foot label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+  .filters-foot input { accent-color: var(--accent); width: 16px; height: 16px; }
+  .lft-pill { display: inline-block; background: #e7f7ee; color: var(--good); border-radius: 999px; padding: 1px 8px; font-size: 11px; font-weight: 700; }
+  @media (max-width: 640px) { .filters { grid-template-columns: 1fr 1fr; } }
   .search-local { width: 100%; border: 1px solid var(--border); background: var(--bg); border-radius: 10px; padding: 10px 12px; font: inherit; }
 </style>
 </head>
@@ -30,9 +37,20 @@
   <div class="stack">
     <section class="card pad">
       <h1 class="page">Players</h1>
-      <div class="sub">Every player Veridium has verified from Riot's API, highest rank first.</div>
+      <div class="sub">Every player Veridium has verified from Riot's API, highest rank first. Filter to scout.</div>
       <hr class="divider" />
       <input class="search-local" id="filter" placeholder="Filter by name…" aria-label="Filter players" />
+      <form class="filters" id="filters" aria-label="Player filters">
+        <select name="game" aria-label="Game"><option value="">Any game</option><option value="tft">Teamfight Tactics</option><option value="lol">League of Legends</option></select>
+        <select name="region" aria-label="Region"><option value="">Any region</option></select>
+        <select name="minTier" aria-label="Minimum rank"><option value="">Any rank</option></select>
+        <select name="role" aria-label="League of Legends role"><option value="">Any LoL role</option>
+          <option value="TOP">Top</option><option value="JUNGLE">Jungle</option><option value="MIDDLE">Mid</option><option value="BOTTOM">Bot</option><option value="UTILITY">Support</option></select>
+      </form>
+      <div class="filters-foot">
+        <label><input type="checkbox" form="filters" name="lft" value="1" /> Looking for team only</label>
+        <span class="sub" id="count"></span>
+      </div>
     </section>
     <section id="orgMatches" hidden>
       <h2 style="margin:4px 0 10px">Organizations</h2>
@@ -57,23 +75,55 @@
 <script>
   let players = [];
   let orgs = [];
-  const q = new URLSearchParams(location.search).get('q') ?? '';
-  $('filter').value = q;
+  const params = new URLSearchParams(location.search);
+  const ROLE_NAMES = { TOP: 'Top', JUNGLE: 'Jungle', MIDDLE: 'Mid', BOTTOM: 'Bot', UTILITY: 'Support' };
+  const TIERS = ['IRON', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'EMERALD', 'DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER'];
+  $('filter').value = params.get('q') ?? '';
   document.querySelector('#lookup select').innerHTML = regionOptions(Veridium.getMe()?.region ?? 'na1');
+  const form = $('filters');
+  form.region.innerHTML += REGIONS.map((r) => `<option value="${r}">${r.toUpperCase()}</option>`).join('');
+  form.minTier.innerHTML += TIERS.map((t) => `<option value="${t}">${titleCase(t)}+</option>`).join('');
+  for (const key of ['game', 'region', 'minTier', 'role']) form[key].value = params.get(key) ?? '';
+  document.querySelector('[name=lft]').checked = params.get('lft') === '1';
+
+  // Server-side filters (kept in the URL so a search can be shared); the name box filters instantly on top.
+  function filterQuery() {
+    const q = new URLSearchParams();
+    for (const key of ['game', 'region', 'minTier', 'role']) if (form[key].value) q.set(key, form[key].value);
+    if (document.querySelector('[name=lft]').checked) q.set('lft', '1');
+    return q;
+  }
+
+  async function load() {
+    const q = filterQuery();
+    const url = new URL(location.href);
+    url.search = q.toString();
+    if ($('filter').value.trim()) url.searchParams.set('q', $('filter').value.trim());
+    history.replaceState(null, '', url);
+    try {
+      players = await api(`/api/players?${q}`);
+      render();
+    } catch (err) {
+      $('list').innerHTML = `<div class="card pad empty">${esc(err.message)}</div>`;
+    }
+  }
 
   function render() {
     const term = $('filter').value.trim().toLowerCase();
     const shown = players.filter((p) => p.riotId.toLowerCase().includes(term));
+    const filtered = filterQuery().toString() || term;
+    $('count').textContent = `${shown.length} player${shown.length === 1 ? '' : 's'}${filtered ? ' match' : ''}`;
     $('list').innerHTML = shown.length ? shown.map((p) => `
       <a class="card pcard" href="${esc(profileUrl(p))}">
         <div class="top"><span class="mini-avatar">${esc(p.riotId.charAt(0).toUpperCase())}</span>
-          <div><b>${esc(p.riotId.split('#')[0])}</b> <span class="verified">✔</span><div class="sub">#${esc(p.riotId.split('#')[1])} · ${esc(p.region.toUpperCase())} · ${esc(playedGames(p))}</div></div></div>
+          <div><b>${esc(p.riotId.split('#')[0])}</b> <span class="verified">✔</span><div class="sub">#${esc(p.riotId.split('#')[1])} · ${esc(p.region.toUpperCase())} · ${esc(playedGames(p))}${p.lol?.mainRole ? ` · ${esc(ROLE_NAMES[p.lol.mainRole] ?? p.lol.mainRole)}` : ''}</div>
+          ${p.lookingForTeam ? `<span class="lft-pill">Looking for team${p.lookingForTeam.roles ? ` · ${esc(p.lookingForTeam.roles)}` : ''}</span>` : ''}</div></div>
         <div class="nums">
           <span class="${p.bestRank?.game === 'tft' ? 'best' : ''}">TFT${p.bestRank?.game === 'tft' ? '<i class="best-tag">Best</i>' : ''}<b>${esc(fmtRank(p.rank))}</b></span>
           <span class="${p.bestRank?.game === 'lol' ? 'best' : ''}">LoL${p.bestRank?.game === 'lol' ? '<i class="best-tag">Best</i>' : ''}<b>${esc(p.lol ? fmtRank(p.lol.soloRank) : '–')}</b></span>
           <span>Games<b>${p.totalMatches + (p.lol?.games ?? 0)}</b></span>
         </div>
-      </a>`).join('') : `<div class="card pad empty" style="grid-column:1/-1">No players match "${esc(term)}". Look them up by Riot ID →</div>`;
+      </a>`).join('') : `<div class="card pad empty" style="grid-column:1/-1">${filtered ? 'No players match these filters.' : 'No players yet.'} You can also look someone up by Riot ID →</div>`;
     const orgHits = term ? orgs.filter((o) => o.name.toLowerCase().includes(term)) : [];
     $('orgMatches').hidden = !orgHits.length;
     $('orgList').innerHTML = orgHits.map((o) => `
@@ -83,16 +133,23 @@
       </a>`).join('');
   }
 
-  $('filter').addEventListener('input', render);
+  $('filter').addEventListener('input', () => {
+    render();
+    const url = new URL(location.href);
+    $('filter').value.trim() ? url.searchParams.set('q', $('filter').value.trim()) : url.searchParams.delete('q');
+    history.replaceState(null, '', url);
+  });
+  form.addEventListener('change', load);
+  // The "Looking for team" box sits outside the <form> in the page, so its change event doesn't bubble to it.
+  document.querySelector('[name=lft]').addEventListener('change', load);
   $('lookup').addEventListener('submit', (e) => {
     e.preventDefault();
     const f = Object.fromEntries(new FormData(e.target));
     location.href = Veridium.playerHref(f.riotId.trim(), f.region);
   });
 
-  Promise.all([api('/api/players'), api('/api/organizations').catch(() => [])])
-    .then(([p, o]) => { players = p; orgs = o; render(); })
-    .catch((err) => { $('list').innerHTML = `<div class="card pad empty">${esc(err.message)}</div>`; });
+  api('/api/organizations').then((o) => { orgs = o; render(); }).catch(() => {});
+  load();
 </script>
 </body>
 </html>

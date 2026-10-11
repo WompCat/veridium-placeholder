@@ -134,7 +134,23 @@ describe('GET /api/players', () => {
       ['Kairo#NA1', 'lol', 'DIAMOND'],
       ['WompCat#NA1', 'tft', 'GOLD'],
     ]);
-    expect(players[0].lol).toEqual({ soloRank: { tier: 'DIAMOND', division: 'II', leaguePoints: 40 }, games: 3, winRate: 0.667 });
+    expect(players[0].lol).toEqual({ soloRank: { tier: 'DIAMOND', division: 'II', leaguePoints: 40 }, games: 3, winRate: 0.667, mainRole: 'MIDDLE' });
     expect(players[1].lol).toBeNull();
+
+    // Search: filters by game, region, rank, LoL role and name, sorting by the chosen game's rank.
+    const search = async (qs: string) => (await request(app).get(`/api/players?${qs}`)).body.map((p: any) => p.riotId);
+    expect(await search('game=tft')).toEqual(['WompCat#NA1']);
+    expect(await search('game=lol')).toEqual(['Kairo#NA1']);
+    expect(await search('minTier=diamond')).toEqual(['Kairo#NA1']);
+    expect(await search('minTier=gold')).toEqual(['Kairo#NA1', 'WompCat#NA1']);
+    expect(await search('game=tft&minTier=platinum')).toEqual([]);
+    expect(await search('role=middle')).toEqual(['Kairo#NA1']);
+    expect(await search('role=jungle')).toEqual([]);
+    expect(await search('region=euw1')).toEqual([]);
+    expect(await search('q=womp')).toEqual(['WompCat#NA1']);
+    expect(await search('lft=1')).toEqual([]);
+    for (const bad of ['game=chess', 'minTier=wood', 'role=carry', 'region=mars']) {
+      expect((await request(app).get(`/api/players?${bad}`)).status).toBe(400);
+    }
   });
 });
