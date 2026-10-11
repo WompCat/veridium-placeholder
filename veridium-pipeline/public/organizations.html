@@ -54,7 +54,8 @@
     $('list').innerHTML = orgs.length ? orgs.map((o) => `
       <a class="card org-row" href="org.html?id=${encodeURIComponent(o.id)}">
         <span class="org-logo-sm">${esc(initials(o.name))}</span>
-        <div class="grow"><b style="font-size:16px">${esc(o.name)}</b><div class="sub">Organization · on Veridium since ${esc(fmtDate(o.createdAt))}</div></div>
+        <div class="grow"><b style="font-size:16px">${esc(o.name)}</b>${o.verifiedAt ? ` ${ORG_VERIFIED}` : ''}
+          <div class="sub">${o.description ? esc(o.description.length > 110 ? o.description.slice(0, 110) + '…' : o.description) : `Organization · on Veridium since ${esc(fmtDate(o.createdAt))}`}</div></div>
         <div class="nums"><span><b>${o.rosterSize}</b>Roster</span><span><b>${o.openVacancies}</b>Open roles</span></div>
         <span class="btn small">View dashboard</span>
       </a>`).join('') : '<div class="card pad empty">No organizations yet. Create the first one to start recruiting.</div>';

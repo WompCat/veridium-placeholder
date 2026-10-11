@@ -264,3 +264,6 @@
   .bell-list small { color: var(--muted); font-size: 11px; }
   .bell-empty { padding: 22px 16px; color: var(--muted); font-size: 13px; text-align: center; line-height: 1.5; }
   @media (max-width: 640px) { .bell-wrap { margin-left: auto; } .bell-wrap + .me-wrap { margin-left: 8px; } .bell-menu { position: fixed; left: 16px; right: 16px; top: 64px; width: auto; } }
+
+  /* ---- "Verified" organization badge ---- */
+  .org-verified { display: inline-flex; align-items: center; gap: 4px; background: #e8f0ff; color: #2f5bd6; border-radius: 999px; padding: 2px 9px; font-size: 11px; font-weight: 700; white-space: nowrap; vertical-align: middle; cursor: help; }

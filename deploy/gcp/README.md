@@ -44,9 +44,10 @@ so nothing needs installing and no keys leave Google.
 | Deploy the latest code | `bash deploy/gcp/veridium-gcp.sh deploy` |
 | Address, health, recent logs | `bash deploy/gcp/veridium-gcp.sh status` |
 
-The Riot key, site password, contact email and domain can also be changed without any command: Compute
-Engine → VM instances → `veridium` → Edit → Metadata, edit `veridium-riot-api-key`,
-`veridium-site-password` or `veridium-contact-email`, and Save. The VM applies the change and restarts
+The Riot key, site password, contact email, staff emails and domain can also be changed without any
+command: Compute Engine → VM instances → `veridium` → Edit → Metadata, edit `veridium-riot-api-key`,
+`veridium-site-password`, `veridium-contact-email`, `veridium-admin-emails` (who can verify
+organizations) or `veridium-domain`, and Save. The VM applies the change and restarts
 the app within seconds.
 
 ## How it works

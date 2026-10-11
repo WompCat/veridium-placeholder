@@ -96,6 +96,12 @@ export class Notifier {
       `org.html?id=${encodeURIComponent(orgId)}`);
   }
 
+  orgVerified(orgId: string) {
+    const org = this.db.prepare('SELECT name FROM organizations WHERE id = ?').get(orgId) as { name: string } | undefined;
+    this.add(this.orgAdmins(orgId), 'org.verified', `Veridium verified ${org?.name ?? 'your organization'}. The badge now shows on your page and vacancies.`,
+      `org.html?id=${encodeURIComponent(orgId)}`);
+  }
+
   // ---- Reading ----
 
   list(userId: string, limit = 20): { unread: number; items: Notification[] } {

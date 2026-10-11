@@ -3,6 +3,7 @@
 #   veridium-riot-api-key   RIOT_API_KEY (dev keys expire daily: update this one)
 #   veridium-site-password  SITE_PASSWORD (whole-site password; keep it set until launch)
 #   veridium-contact-email  CONTACT_EMAIL (shown on the Privacy Policy and Terms)
+#   veridium-admin-emails   ADMIN_EMAILS (your account email(s): Veridium staff, can verify organizations)
 #   veridium-domain         the site's hostname for HTTPS (default: <external-ip>.sslip.io)
 #   veridium-branch         branch to run (default: main)
 #   veridium-deploy         change it (e.g. to a timestamp) to pull the latest code and restart
@@ -31,8 +32,9 @@ quoted() {
 }
 
 write_env() {
-  local tmp riot site contact
-  riot=$(quoted veridium-riot-api-key) && site=$(quoted veridium-site-password) && contact=$(quoted veridium-contact-email) || return 1
+  local tmp riot site contact admins
+  riot=$(quoted veridium-riot-api-key) && site=$(quoted veridium-site-password) && contact=$(quoted veridium-contact-email) \
+    && admins=$(quoted veridium-admin-emails) || return 1
   tmp=$(mktemp "$CONF/.env.XXXXXX")
   chmod 600 "$tmp"   # secrets: readable by root only (systemd reads it before dropping privileges)
   {
@@ -44,6 +46,7 @@ write_env() {
     echo "RIOT_API_KEY=$riot"
     echo "SITE_PASSWORD=$site"
     echo "CONTACT_EMAIL=$contact"
+    echo "ADMIN_EMAILS=$admins"
   } > "$tmp"
   mv "$tmp" "$ENV_FILE"
 }

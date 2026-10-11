@@ -10,6 +10,8 @@ export const config = {
   dbPath: process.env.DB_PATH || './data/veridium.db',
   // Shown on the Privacy Policy and Terms as the address for privacy and account requests.
   contactEmail: process.env.CONTACT_EMAIL || '',
+  // Veridium's own staff (comma-separated emails): they can verify organizations.
+  adminEmails: (process.env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
   // Seasons (TFT sets) to keep full history for: the current one plus SEASONS - 1 previous.
   seasons: Number(process.env.SEASONS || 3),
 };

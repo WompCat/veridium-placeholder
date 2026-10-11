@@ -34,7 +34,7 @@ beforeEach(() => {
   seedPlayers();
   new OrgRepo(store.db).createOrganization('Obscurity Esports');
   // Org routes never call Riot; a client with no key would throw if they tried.
-  app = createApp({ client: new RiotClient({ apiKey: '' }), store, seasons: 3 });
+  app = createApp({ client: new RiotClient({ apiKey: '' }), store, seasons: 3 }, undefined, { adminEmails: ['staff@veridium.gg'] });
   // The org's admin manages it; players apply from their own accounts.
   auth = new AuthRepo(store.db);
   const admin = auth.createUser('admin@obscurity.gg', 'unused-hash', null, TERMS_VERSION);
@@ -94,6 +94,7 @@ describe('migrations', () => {
       { version: '009_under_18_flag.sql' },
       { version: '010_looking_for_team.sql' },
       { version: '011_notifications.sql' },
+      { version: '012_org_profiles.sql' },
     ]);
     const tables = reopened.db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`).all();
     expect(tables.map((t: any) => t.name)).toEqual(
@@ -109,6 +110,37 @@ describe('organizations', () => {
     await postVacancy();
     const list = (await api().get('/api/organizations')).body;
     expect(list).toEqual([expect.objectContaining({ id: ORG, name: 'Obscurity Esports', rosterSize: 1, openVacancies: 1 })]);
+  });
+});
+
+describe('org profile and verification', () => {
+  it('org admins edit the profile; only Veridium staff verify; roster history is public', async () => {
+    const stranger = playerCookie(KAIRO);
+    expect((await as(stranger).patch(`/api/organizations/${ORG}`).send({ description: 'x' })).status).toBe(403);
+    expect((await api().patch(`/api/organizations/${ORG}`).send({ website: 'obscurity.gg' })).status).toBe(400);
+    expect((await api().patch(`/api/organizations/${ORG}`).send({})).status).toBe(400);
+    const edited = await api().patch(`/api/organizations/${ORG}`).send({ description: 'TFT and LoL org from NA.', website: 'https://obscurity.gg' });
+    expect(edited.body).toMatchObject({ description: 'TFT and LoL org from NA.', website: 'https://obscurity.gg', verifiedAt: null });
+
+    // Verification: staff only, and the org's admins are told.
+    expect((await api().post(`/api/organizations/${ORG}/verify`).send({ verified: true })).status).toBe(403); // an org admin isn't staff
+    const staff = auth.createUser('staff@veridium.gg', 'unused-hash', null, TERMS_VERSION);
+    const staffCookie = `veridium_session=${auth.createSession(staff.id).token}`;
+    expect((await as(staffCookie).get(`/api/organizations/${ORG}`)).body.viewer).toMatchObject({ siteAdmin: true, isAdmin: false });
+    expect((await as(staffCookie).get('/api/auth/me')).body.user.siteAdmin).toBe(true);
+    const verified = await as(staffCookie).post(`/api/organizations/${ORG}/verify`).send({ verified: true });
+    expect(verified.body.verifiedAt).toEqual(expect.any(String));
+    expect((await api().get('/api/notifications')).body.items[0]).toMatchObject({ type: 'org.verified' });
+    await postVacancy();
+    expect((await api().get('/api/vacancies')).body[0]).toMatchObject({ organizationVerified: true });
+    expect((await api().get('/api/organizations')).body[0]).toMatchObject({ verifiedAt: expect.any(String), description: 'TFT and LoL org from NA.' });
+    expect((await as(staffCookie).post(`/api/organizations/${ORG}/verify`).send({ verified: false })).body.verifiedAt).toBeNull();
+
+    // Roster history: former players, public.
+    await api().post(`/api/organizations/${ORG}/roster`).send({ playerPuuid: KAIRO, role: 'Sub' });
+    await api().delete(`/api/organizations/${ORG}/roster/${KAIRO}`);
+    const history = (await request(app).get(`/api/organizations/${ORG}/history`)).body;
+    expect(history.map((m: any) => [m.player.riotId, m.role, !!m.leftAt])).toEqual([['Kairo#NA1', 'Sub', true]]);
   });
 });
 
@@ -270,7 +302,7 @@ describe('applications: the player ↔ org loop', () => {
     expect(forAdmin.items).toEqual([
       expect.objectContaining({ type: 'application.received', text: 'Kairo applied to Flex Player.', link: `org.html?id=${ORG}#vacancies`, read: false }),
     ]);
-    expect(JSON.stringify(forAdmin)).not.toMatch(/under|18/i); // the flag stays on the application
+    for (const n of forAdmin.items) expect(n.text).not.toMatch(/under|minor|age/i); // the flag stays on the application
 
     await api().patch(`/api/applications/${appId}`).send({ status: 'accepted' });
     const forKairo = await texts(playerCookie(KAIRO));

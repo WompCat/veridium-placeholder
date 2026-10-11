@@ -106,7 +106,7 @@
             <div class="who-cell">
               <span class="org-chip">${esc(v.organizationName.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase())}</span>
               <div><div class="item-title">${esc(v.title)}${v.role ? ` <span class="pill">${esc(v.role)}</span>` : ''}</div>
-                <div class="sub"><a href="org.html?id=${encodeURIComponent(v.organizationId)}">${esc(v.organizationName)}</a> · ${esc(v.game)} · ${esc(v.region)} · ${esc(titleCase(v.level))}</div></div>
+                <div class="sub"><a href="org.html?id=${encodeURIComponent(v.organizationId)}">${esc(v.organizationName)}</a>${v.organizationVerified ? ` ${ORG_VERIFIED}` : ''} · ${esc(v.game)} · ${esc(v.region)} · ${esc(titleCase(v.level))}</div></div>
             </div>
             <div class="apply-col"><span class="sub">Posted ${esc(fmtDate(v.postedAt))}</span>${applyControl(v)}</div>
           </div>

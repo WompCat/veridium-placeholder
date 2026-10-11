@@ -903,7 +903,7 @@
       <div class="item">
         <div class="item-head">
           <div><div class="item-title">${esc(v.title)}${v.role ? ` <span class="pill">${esc(v.role)}</span>` : ''}</div>
-            <div class="sub">${esc(v.organizationName)} · ${esc(v.game)} · ${esc(v.region)}</div></div>
+            <div class="sub">${esc(v.organizationName)}${v.organizationVerified ? " ✔" : ""} · ${esc(v.game)} · ${esc(v.region)}</div></div>
           ${applied.has(v.id)
             ? `<span class="status ${esc(applied.get(v.id))}">${esc(applied.get(v.id) === 'pending' ? 'applied' : applied.get(v.id))}</span>`
             : own ? `<button class="btn small primary" data-apply="${esc(v.id)}">Apply</button>`

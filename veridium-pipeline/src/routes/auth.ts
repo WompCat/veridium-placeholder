@@ -1,7 +1,7 @@
 import { Router, type Request } from 'express';
 import { DUMMY_HASH, hashPassword, verifyPassword } from '../auth/passwords';
 import type { AuthRepo, User } from '../auth/repo';
-import { clearSessionCookie, requireSession, requireUser, sessionToken, setSessionCookie } from '../auth/http';
+import { clearSessionCookie, isSiteAdmin, requireSession, requireUser, sessionToken, setSessionCookie } from '../auth/http';
 import { TERMS_VERSION } from '../legal';
 import { badRequest, HttpError, notFound } from '../orgs/errors';
 import { RiotApiError } from '../riot/client';
@@ -29,6 +29,7 @@ function accountView(deps: AuthDeps, user: User) {
     player: player ? { puuid: player.puuid, riotId: `${player.gameName}#${player.tagLine}`, region: player.region } : null,
     adminOf: deps.auth.adminOrgs(user.id),
     termsAccepted: user.termsVersion === TERMS_VERSION,
+    siteAdmin: isSiteAdmin(user, deps.adminEmails),
     lookingForTeam: user.lookingForTeam,
     lftRoles: user.lftRoles,
     termsAcceptedAt: user.termsAcceptedAt,

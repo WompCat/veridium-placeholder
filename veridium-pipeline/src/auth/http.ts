@@ -72,6 +72,11 @@ export function requireLinkedPlayer(req: Request): string {
   return user.playerPuuid;
 }
 
+/** A Veridium staff account (listed in ADMIN_EMAILS), e.g. to verify organizations. */
+export function isSiteAdmin(user: User | null | undefined, adminEmails: string[]): boolean {
+  return !!user && adminEmails.includes(user.email.toLowerCase());
+}
+
 export function requireOrgAdmin(auth: AuthRepo, req: Request, orgId: string): User {
   const user = requireUser(req);
   if (!auth.isOrgAdmin(orgId, user.id)) throw forbidden("Only this organization's admins can do that.");

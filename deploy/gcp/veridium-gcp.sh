@@ -80,11 +80,12 @@ EOF
 
 cmd_create() {
   preflight
-  local riot site contact
+  local riot site contact admins
   read -rsp "Riot API key (RGAPI-…): " riot; echo
   [ -n "$riot" ] || die "A Riot API key is required (developer.riotgames.com)"
   read -rsp "Site password (no ' quotes; leave blank to skip, not recommended): " site; echo
   read -rp  "Contact email for the Privacy Policy (optional): " contact
+  read -rp  "Your Veridium account email, to verify organizations (optional, can be set later): " admins
 
   say "Enabling the Compute Engine API"
   g services enable compute.googleapis.com
@@ -109,6 +110,7 @@ cmd_create() {
   [ -n "$riot" ] && printf '%s' "$riot" > "$secrets/riot" && files+=",veridium-riot-api-key=$secrets/riot"
   [ -n "$site" ] && printf '%s' "$site" > "$secrets/site" && files+=",veridium-site-password=$secrets/site"
   [ -n "$contact" ] && printf '%s' "$contact" > "$secrets/contact" && files+=",veridium-contact-email=$secrets/contact"
+  [ -n "$admins" ] && printf '%s' "$admins" > "$secrets/admins" && files+=",veridium-admin-emails=$secrets/admins"
   g compute instances create "$NAME" --zone "$ZONE" \
     --machine-type e2-micro \
     --image-family debian-12 --image-project debian-cloud \

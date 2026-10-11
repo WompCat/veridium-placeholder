@@ -54,7 +54,7 @@
     <div class="banner">
       <div class="org-logo" id="orgLogo">?</div>
       <div class="who">
-        <h1 id="orgName">Loading…</h1>
+        <h1><span id="orgName">Loading…</span> <span class="org-verified" id="orgVerified" hidden title="Verified by Veridium: this organization is who it says it is">✔ Verified</span></h1>
         <div class="meta" id="orgMeta">Organization</div>
       </div>
       <div class="kpis">
@@ -75,6 +75,15 @@
 
   <!-- Overview -->
   <div class="stack" id="view-overview" role="tabpanel" data-view="overview" hidden>
+    <section class="card pad" id="aboutCard">
+      <div class="table-head" style="margin-bottom:6px"><h2>About</h2><span id="verifyStatus" class="sub"></span></div>
+      <p id="orgDesc" style="margin:0 0 10px;line-height:1.55"></p>
+      <dl class="settings-rows" id="aboutRows" style="margin-top:0"></dl>
+      <div id="staffBox" hidden style="margin-top:12px;border-top:1px dashed var(--border);padding-top:12px">
+        <span class="sub">Veridium staff:</span> <button class="btn small" id="verifyBtn" type="button"></button>
+        <div class="sub" style="margin-top:6px">Verify only after confirming the organization is real and the person managing it represents it.</div>
+      </div>
+    </section>
     <section class="card pad">
       <h2>Summary</h2>
       <div class="stats four" style="margin-top:14px">
@@ -101,6 +110,14 @@
         <thead><tr><th>Player</th><th>Rank</th><th>Win Rate</th><th>Role</th><th>Status</th><th>Joined</th><th data-admin></th></tr></thead>
         <tbody id="roster"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
       </table>
+    </div>
+    <div id="historyBlock" hidden>
+      <hr class="divider" />
+      <h2 style="font-size:14px;margin-bottom:4px">Former players</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Player</th><th>Role</th><th>Joined</th><th>Left</th></tr></thead>
+        <tbody id="history"></tbody>
+      </table></div>
     </div>
     <div data-admin>
     <hr class="divider" />
@@ -156,6 +173,15 @@
     <h2>Organization settings</h2>
     <div class="sub">Visible to this organization's admins. Editing the name and logo is coming soon.</div>
     <dl class="settings-rows" id="settings"></dl>
+    <hr class="divider" />
+    <h2 style="font-size:15px;margin-bottom:4px">Public profile</h2>
+    <div class="sub" style="margin-bottom:12px">Shown in the About section of your page, so players can check you out before applying.</div>
+    <form id="profileForm" style="display:grid;gap:12px;max-width:620px">
+      <label class="field">Description<textarea name="description" maxlength="500" rows="4" placeholder="Who you are, what you play, what you're looking for." style="border:1px solid var(--border);background:var(--bg);border-radius:9px;padding:9px 11px;font:inherit;font-size:13px;resize:vertical"></textarea></label>
+      <label class="field">Website<input name="website" maxlength="200" placeholder="https://…" /></label>
+      <div><button class="btn primary">Save profile</button></div>
+      <div class="form-msg" id="profileMsg" role="status"></div>
+    </form>
   </section>
 
   <datalist id="roleOptions"><option>Player</option><option>Flex</option><option>Sub</option><option>Coach</option><option>Analyst</option><option>Manager</option></datalist>
@@ -378,8 +404,60 @@
     showTab();
   }
 
+  // About: description, website, history on Veridium and verification, for everyone.
+  function renderAbout() {
+    $('orgVerified').hidden = !org.verifiedAt;
+    $('verifyStatus').innerHTML = org.verifiedAt
+      ? `${ORG_VERIFIED} since ${esc(fmtDate(org.verifiedAt))}`
+      : 'Not verified yet';
+    $('orgDesc').textContent = org.description || (isAdmin() ? 'Add a description in Settings so players know who you are.' : 'No description yet.');
+    $('orgDesc').classList.toggle('sub', !org.description);
+    const site = org.website;
+    $('aboutRows').innerHTML = [
+      site ? ['Website', `<a href="${esc(site)}" target="_blank" rel="noopener nofollow">${esc(site.replace(/^https?:\/\//, ''))}</a>`] : null,
+      ['On Veridium since', esc(fmtDate(org.createdAt))],
+      ['Verification', org.verifiedAt
+        ? 'Veridium confirmed this organization is who it says it is.'
+        : "Veridium hasn't confirmed this organization yet. Check its website and roster before sharing anything personal."],
+    ].filter(Boolean).map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
+    $('staffBox').hidden = !org.viewer?.siteAdmin;
+    $('verifyBtn').textContent = org.verifiedAt ? 'Remove verification' : 'Verify this organization';
+    if (isAdmin()) {
+      $('profileForm').description.value = org.description ?? '';
+      $('profileForm').website.value = org.website ?? '';
+    }
+  }
+
+  async function loadHistory() {
+    const past = await api(`${base}/history`).catch(() => []);
+    $('historyBlock').hidden = !past.length;
+    $('history').innerHTML = past.map((m) => `<tr>
+      <td><a href="${esc(profileUrl(m.player))}"><b>${esc(m.player.riotId.split('#')[0])}</b></a> <span class="sub">#${esc(m.player.riotId.split('#')[1])}</span></td>
+      <td>${esc(m.role)}</td><td>${esc(fmtDate(m.joinedAt))}</td><td>${esc(fmtDate(m.leftAt))}</td></tr>`).join('');
+  }
+
+  $('profileForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      const updated = await api(base, { method: 'PATCH', body: { description: e.target.description.value.trim(), website: e.target.website.value.trim() } });
+      org = { ...org, ...updated };
+      renderAbout();
+      setMsg($('profileMsg'), 'Saved.', 'ok');
+    } catch (err) {
+      setMsg($('profileMsg'), err.message, 'error');
+    }
+  });
+
+  $('verifyBtn').addEventListener('click', () => act(async () => {
+    const verified = !org.verifiedAt;
+    if (!confirm(verified ? `Mark ${org.name} as verified?` : `Remove ${org.name}'s verification?`)) return;
+    const updated = await api(`${base}/verify`, { method: 'POST', body: { verified } });
+    org = { ...org, ...updated };
+    renderAbout();
+  }));
+
   async function refresh() {
-    await Promise.all([loadRoster(), loadVacancies()]);
+    await Promise.all([loadRoster(), loadVacancies(), loadHistory()]);
     await renderOverview();
   }
 
@@ -488,6 +566,7 @@
     try {
       org = await api(base);
       applyViewer();
+      renderAbout();
       $('orgName').textContent = org.name;
       $('orgLogo').textContent = org.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
       document.title = `${org.name} · Veridium`;

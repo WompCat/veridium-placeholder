@@ -1,5 +1,5 @@
 import { Router, type ErrorRequestHandler, type Request } from 'express';
-import { requireLinkedPlayer, requireOrgAdmin, requireUser } from '../auth/http';
+import { isSiteAdmin, requireLinkedPlayer, requireOrgAdmin, requireUser } from '../auth/http';
 import type { AuthRepo } from '../auth/repo';
 import type { Notifier } from '../notifications';
 import { buildFeed, listPlayerSummaries } from '../feed';
@@ -17,6 +17,8 @@ export interface OrgDeps extends IngestDeps {
   orgs: OrgRepo;
   auth: AuthRepo;
   notifier: Notifier;
+  /** Veridium staff emails (ADMIN_EMAILS): they can verify organizations. */
+  adminEmails: string[];
 }
 
 const MEMBERSHIP_STATUSES: MembershipStatus[] = ['active', 'bench'];
@@ -119,7 +121,41 @@ export function organizationsRouter(deps: OrgDeps): Router {
   router.get('/:id', (req, res) => {
     const org = orgs.requireOrganization(req.params.id);
     const isAdmin = !!req.user && deps.auth.isOrgAdmin(org.id, req.user.id);
-    res.json({ ...org, rosterSize: orgs.listRoster(org.id).length, viewer: { loggedIn: !!req.user, isAdmin } });
+    const siteAdmin = isSiteAdmin(req.user, deps.adminEmails);
+    res.json({ ...org, rosterSize: orgs.listRoster(org.id).length, viewer: { loggedIn: !!req.user, isAdmin, siteAdmin } });
+  });
+
+  // The org's own profile: { description?, website? } (null or "" clears). Org admins only.
+  router.patch('/:id', (req, res) => {
+    adminOf(req);
+    const b = body(req);
+    const patch: { description?: string | null; website?: string | null } = {};
+    if ('description' in b) patch.description = b.description === null || b.description === '' ? null : text(b, 'description', { max: 500 }) ?? null;
+    if ('website' in b) {
+      const site = b.website === null || b.website === '' ? null : text(b, 'website', { max: 200 }) ?? null;
+      if (site && !/^https?:\/\/[^\s"'<>]+\.[^\s"'<>]+$/i.test(site)) throw badRequest('Website must be a full address starting with https://');
+      patch.website = site;
+    }
+    if (!Object.keys(patch).length) throw badRequest('Nothing to update: send "description" and/or "website"');
+    res.json(orgs.updateProfile(req.params.id, patch));
+  });
+
+  // The "verified" badge: Veridium staff confirm an org is who it says it is. { verified: boolean }
+  router.post('/:id/verify', (req, res) => {
+    const user = requireUser(req);
+    if (!isSiteAdmin(user, deps.adminEmails)) throw forbidden('Only Veridium staff can verify organizations.');
+    const verified = flag(body(req), 'verified');
+    if (verified === undefined) throw badRequest('"verified" must be true or false');
+    const before = orgs.requireOrganization(req.params.id);
+    const org = orgs.setVerified(before.id, verified);
+    if (verified && !before.verifiedAt) deps.notifier.orgVerified(org.id);
+    res.json(org);
+  });
+
+  // Former players: the org's public roster history.
+  router.get('/:id/history', (req, res) => {
+    const org = orgs.requireOrganization(req.params.id);
+    res.json(orgs.listRosterHistory(org.id).map((m) => ({ ...m, player: summary(deps, m.playerPuuid) })));
   });
 
   const adminOf = (req: Request) => requireOrgAdmin(deps.auth, req, orgs.requireOrganization(String(req.params.id)).id);

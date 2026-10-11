@@ -95,3 +95,6 @@ function applyConfirmForm(vacancyId) {
 function submitApplication(vacancyId, under18) {
   return api(`/api/vacancies/${encodeURIComponent(vacancyId)}/applications`, { method: 'POST', body: { under18 } });
 }
+
+/** The "Verified" badge Veridium staff grant to organizations. */
+const ORG_VERIFIED = '<span class="org-verified" title="Verified by Veridium: this organization is who it says it is">✔ Verified</span>';

@@ -45,7 +45,7 @@ function requirePassword(password: string): RequestHandler {
 export function createApp(
   deps: IngestDeps,
   orgs = new OrgRepo(deps.store.db),
-  opts: { sitePassword?: string; auth?: AuthRepo } = {},
+  opts: { sitePassword?: string; auth?: AuthRepo; adminEmails?: string[] } = {},
 ) {
   const app = express();
   app.set('trust proxy', 1); // behind Render's TLS proxy: req.secure reflects the visitor's HTTPS
@@ -54,7 +54,7 @@ export function createApp(
   const auth = opts.auth ?? new AuthRepo(deps.store.db);
   app.use(sessions(auth));
   app.use('/api/players', playersRouter(deps));
-  const orgDeps = { ...deps, orgs, auth, notifier: new Notifier(deps.store.db) };
+  const orgDeps = { ...deps, orgs, auth, notifier: new Notifier(deps.store.db), adminEmails: opts.adminEmails ?? config.adminEmails };
   app.use('/api/auth', authRouter(orgDeps));
   app.use('/api/players', playerApplicationsRouter(orgDeps));
   app.use('/api/organizations', organizationsRouter(orgDeps));

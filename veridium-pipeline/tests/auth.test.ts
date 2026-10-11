@@ -158,8 +158,8 @@ describe('permissions', () => {
     expect((await create(stranger.cookie, 'northwind esports')).status).toBe(409);
 
     const ORG = 'northwind-esports';
-    expect((await request(app).get(`/api/organizations/${ORG}`).set('Cookie', owner.cookie)).body.viewer).toEqual({ loggedIn: true, isAdmin: true });
-    expect((await request(app).get(`/api/organizations/${ORG}`).set('Cookie', stranger.cookie)).body.viewer).toEqual({ loggedIn: true, isAdmin: false });
+    expect((await request(app).get(`/api/organizations/${ORG}`).set('Cookie', owner.cookie)).body.viewer).toEqual({ loggedIn: true, isAdmin: true, siteAdmin: false });
+    expect((await request(app).get(`/api/organizations/${ORG}`).set('Cookie', stranger.cookie)).body.viewer).toEqual({ loggedIn: true, isAdmin: false, siteAdmin: false });
     expect((await request(app).get('/api/auth/me').set('Cookie', owner.cookie)).body.user.adminOf)
       .toEqual([{ id: ORG, name: 'Northwind Esports', onlyAdmin: true }]);
 

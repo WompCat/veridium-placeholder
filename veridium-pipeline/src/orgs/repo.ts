@@ -43,6 +43,24 @@ interface ApplicationRow {
   under_18: number;
 }
 
+interface OrgRow {
+  id: string;
+  name: string;
+  created_at: string;
+  description: string | null;
+  website: string | null;
+  verified_at: string | null;
+}
+
+const toOrganization = (r: OrgRow): Organization => ({
+  id: r.id,
+  name: r.name,
+  createdAt: r.created_at,
+  description: r.description,
+  website: r.website,
+  verifiedAt: r.verified_at,
+});
+
 const toMembership = (r: MembershipRow): OrgMembership => ({
   playerPuuid: r.player_puuid,
   organizationId: r.organization_id,
@@ -104,7 +122,7 @@ export class OrgRepo {
   // ---- Organizations ----
 
   createOrganization(name: string, id = slugify(name)): Organization {
-    const org = { id, name, createdAt: this.iso() };
+    const org: Organization = { id, name, createdAt: this.iso(), description: null, website: null, verifiedAt: null };
     const inserted = this.db
       .prepare('INSERT OR IGNORE INTO organizations (id, name, created_at) VALUES (?, ?, ?)')
       .run(org.id, org.name, org.createdAt);
@@ -123,30 +141,52 @@ export class OrgRepo {
     })();
   }
 
+  updateProfile(id: string, patch: { description?: string | null; website?: string | null }): Organization {
+    const org = this.requireOrganization(id);
+    const next = { description: org.description, website: org.website, ...patch };
+    this.db.prepare('UPDATE organizations SET description = ?, website = ? WHERE id = ?').run(next.description, next.website, id);
+    return this.requireOrganization(id);
+  }
+
+  setVerified(id: string, verified: boolean): Organization {
+    this.requireOrganization(id);
+    this.db.prepare('UPDATE organizations SET verified_at = ? WHERE id = ?').run(verified ? this.iso() : null, id);
+    return this.requireOrganization(id);
+  }
+
+  /** Former members (who have left), most recent first: the org's public roster history. */
+  listRosterHistory(orgId: string): OrgMembership[] {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM org_memberships WHERE organization_id = ? AND left_at IS NOT NULL
+         ORDER BY left_at DESC, rowid DESC LIMIT 50`,
+      )
+      .all(orgId) as MembershipRow[];
+    return rows.map(toMembership);
+  }
+
   /** Every org with its current roster size and open vacancies. */
   listOrganizations(): Array<Organization & { rosterSize: number; openVacancies: number }> {
     const rows = this.db
       .prepare(
-        `SELECT o.id, o.name, o.created_at,
+        `SELECT o.id, o.name, o.created_at, o.description, o.website, o.verified_at,
            (SELECT COUNT(*) FROM org_memberships m WHERE m.organization_id = o.id AND m.left_at IS NULL) AS roster_size,
            (SELECT COUNT(*) FROM vacancies v WHERE v.organization_id = o.id AND v.status = 'open') AS open_vacancies
          FROM organizations o ORDER BY o.name COLLATE NOCASE`,
       )
-      .all() as Array<{ id: string; name: string; created_at: string; roster_size: number; open_vacancies: number }>;
+      .all() as Array<OrgRow & { roster_size: number; open_vacancies: number }>;
     return rows.map((r) => ({
-      id: r.id,
-      name: r.name,
-      createdAt: r.created_at,
+      ...toOrganization(r),
       rosterSize: r.roster_size,
       openVacancies: r.open_vacancies,
     }));
   }
 
   getOrganization(id: string): Organization | null {
-    const row = this.db.prepare('SELECT id, name, created_at FROM organizations WHERE id = ?').get(id) as
-      | { id: string; name: string; created_at: string }
-      | undefined;
-    return row ? { id: row.id, name: row.name, createdAt: row.created_at } : null;
+    const row = this.db
+      .prepare('SELECT id, name, created_at, description, website, verified_at FROM organizations WHERE id = ?')
+      .get(id) as OrgRow | undefined;
+    return row ? toOrganization(row) : null;
   }
 
   requireOrganization(id: string): Organization {
@@ -268,17 +308,18 @@ export class OrgRepo {
     const where = Object.keys(params).map((key) => conditions[key as keyof typeof conditions]);
     const rows = this.db
       .prepare(
-        `SELECT v.*, o.name AS organization_name,
+        `SELECT v.*, o.name AS organization_name, o.verified_at AS organization_verified_at,
            (SELECT COUNT(*) FROM applications a WHERE a.vacancy_id = v.id) AS application_count,
            (SELECT COUNT(*) FROM applications a WHERE a.vacancy_id = v.id AND a.status = 'pending') AS pending_count
          FROM vacancies v JOIN organizations o ON o.id = v.organization_id
          ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
          ORDER BY v.posted_at DESC, v.rowid DESC`,
       )
-      .all(params) as Array<VacancyRow & { organization_name: string; application_count: number; pending_count: number }>;
+      .all(params) as Array<VacancyRow & { organization_name: string; organization_verified_at: string | null; application_count: number; pending_count: number }>;
     return rows.map((r) => ({
       ...toVacancy(r),
       organizationName: r.organization_name,
+      organizationVerified: !!r.organization_verified_at,
       applicationCount: r.application_count,
       pendingCount: r.pending_count,
     }));

@@ -32,6 +32,10 @@ export interface Organization {
   id: string;
   name: string;
   createdAt: string;
+  description: string | null;
+  website: string | null;
+  /** When a Veridium site admin confirmed the org is who it says it is (null: not verified). */
+  verifiedAt: string | null;
 }
 
 export type MembershipStatus = 'active' | 'bench';
@@ -96,6 +100,7 @@ export interface RosterEntry extends OrgMembership {
 
 export interface VacancyListing extends Vacancy {
   organizationName: string;
+  organizationVerified: boolean;
   applicationCount: number;
   pendingCount: number;
 }
