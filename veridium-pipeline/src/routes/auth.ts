@@ -32,6 +32,8 @@ function accountView(deps: AuthDeps, user: User) {
     siteAdmin: isSiteAdmin(user, deps.adminEmails),
     lookingForTeam: user.lookingForTeam,
     lftRoles: user.lftRoles,
+    emailNotifications: user.emailNotifications,
+    emailAvailable: deps.notifier.emailEnabled,
     termsAcceptedAt: user.termsAcceptedAt,
   };
 }
@@ -159,6 +161,14 @@ export function authRouter(deps: AuthDeps): Router {
     if (typeof b.lookingForTeam !== 'boolean') throw badRequest('"lookingForTeam" must be true or false');
     const roles = str(b, 'roles').slice(0, 60) || null;
     res.json({ user: accountView(deps, auth.setLookingForTeam(user.id, b.lookingForTeam, roles)) });
+  });
+
+  // Email copies of notifications: { enabled: boolean }.
+  router.put('/me/email-notifications', (req, res) => {
+    const user = requireUser(req);
+    const enabled = body(req).enabled;
+    if (typeof enabled !== 'boolean') throw badRequest('"enabled" must be true or false');
+    res.json({ user: accountView(deps, auth.setEmailNotifications(user.id, enabled)) });
   });
 
   // Link a Riot ID to the account, or unlink with { riotId: null }.

@@ -12,6 +12,8 @@ export interface User {
   termsAcceptedAt: string | null;
   lookingForTeam: boolean;
   lftRoles: string | null;
+  /** Email copies of notifications (sent only when an email service is configured). */
+  emailNotifications: boolean;
 }
 
 interface UserRow {
@@ -24,6 +26,7 @@ interface UserRow {
   terms_accepted_at: string | null;
   looking_for_team?: number;
   lft_roles?: string | null;
+  email_notifications?: number;
 }
 
 const toUser = (r: UserRow): User => ({
@@ -35,6 +38,7 @@ const toUser = (r: UserRow): User => ({
   termsAcceptedAt: r.terms_accepted_at,
   lookingForTeam: !!r.looking_for_team,
   lftRoles: r.lft_roles ?? null,
+  emailNotifications: r.email_notifications !== 0,
 });
 
 export const SESSION_DAYS = 30;
@@ -99,6 +103,11 @@ export class AuthRepo {
     this.db.prepare('UPDATE users SET looking_for_team = ?, lft_roles = ? WHERE id = ?').run(on ? 1 : 0, on ? roles : null, userId);
     return this.getUser(userId)!;
   }
+  setEmailNotifications(userId: string, on: boolean): User {
+    this.db.prepare('UPDATE users SET email_notifications = ? WHERE id = ?').run(on ? 1 : 0, userId);
+    return this.getUser(userId)!;
+  }
+
 
   acceptTerms(userId: string, version: string): User {
     this.db.prepare('UPDATE users SET terms_version = ?, terms_accepted_at = ? WHERE id = ?').run(version, this.now().toISOString(), userId);

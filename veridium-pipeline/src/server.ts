@@ -9,6 +9,7 @@ import { config } from './config';
 import { legalInfo } from './legal';
 import { FollowRepo } from './follows';
 import { Notifier } from './notifications';
+import { createMailer, type Mailer } from './email';
 import { TeamHistoryRepo } from './teams';
 import { TournamentRepo } from './tournaments/repo';
 import { adminRouter, organizersRouter, playerTournamentsRouter, tournamentsRouter } from './routes/tournaments';
@@ -50,7 +51,7 @@ function requirePassword(password: string): RequestHandler {
 export function createApp(
   deps: IngestDeps,
   orgs = new OrgRepo(deps.store.db),
-  opts: { sitePassword?: string; auth?: AuthRepo; adminEmails?: string[] } = {},
+  opts: { sitePassword?: string; auth?: AuthRepo; adminEmails?: string[]; mailer?: Mailer | null } = {},
 ) {
   const app = express();
   app.set('trust proxy', 1); // behind Render's TLS proxy: req.secure reflects the visitor's HTTPS
@@ -59,7 +60,7 @@ export function createApp(
   const auth = opts.auth ?? new AuthRepo(deps.store.db);
   app.use(sessions(auth));
   app.use('/api/players', playersRouter(deps));
-  const orgDeps = { ...deps, orgs, auth, notifier: new Notifier(deps.store.db), follows: new FollowRepo(deps.store.db), teams: new TeamHistoryRepo(deps.store.db), tournaments: new TournamentRepo(deps.store.db), adminEmails: opts.adminEmails ?? config.adminEmails };
+  const orgDeps = { ...deps, orgs, auth, notifier: new Notifier(deps.store.db, opts.mailer ?? null), follows: new FollowRepo(deps.store.db), teams: new TeamHistoryRepo(deps.store.db), tournaments: new TournamentRepo(deps.store.db), adminEmails: opts.adminEmails ?? config.adminEmails };
   app.use('/api/auth', authRouter(orgDeps));
   app.use('/api/players', playerApplicationsRouter(orgDeps));
   app.use('/api/organizations', organizationsRouter(orgDeps));
@@ -91,8 +92,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     store: new Store(config.dbPath),
     seasons: config.seasons,
   };
-  createApp(deps, undefined, { sitePassword: config.sitePassword }).listen(config.port, config.host, () => {
+  const mailer = createMailer(config);
+  createApp(deps, undefined, { sitePassword: config.sitePassword, mailer }).listen(config.port, config.host, () => {
     console.log(`Veridium pipeline on http://${config.host}:${config.port}${config.sitePassword ? ' (password protected)' : ''}`);
+    console.log(`Email notifications: ${mailer ? 'on (Brevo)' : 'off (set BREVO_API_KEY and EMAIL_FROM to turn them on)'}`);
     console.log(`Home: http://localhost:${config.port}/`);
     console.log(`Profile page: http://localhost:${config.port}/player.html?riotId=WompCat%23NA1&region=na1`);
     console.log(`Organizations: http://localhost:${config.port}/organizations.html`);

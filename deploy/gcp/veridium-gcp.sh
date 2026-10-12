@@ -4,6 +4,7 @@
 #
 #   bash deploy/gcp/veridium-gcp.sh create    create the VM, data disk, static IP and firewall rule (HTTPS via Caddy)
 #   bash deploy/gcp/veridium-gcp.sh set-key   paste a new Riot API key (dev keys expire every 24h)
+#   bash deploy/gcp/veridium-gcp.sh set-email turn on email notifications (Brevo API key and sender)
 #   bash deploy/gcp/veridium-gcp.sh deploy    pull the latest code on the VM and restart
 #   bash deploy/gcp/veridium-gcp.sh verify    crash test + reboot test, checking the site and its data survive
 #   bash deploy/gcp/veridium-gcp.sh status    address, health, and recent app logs
@@ -134,6 +135,20 @@ cmd_set_key() {
   echo "Saved. The VM picks it up and restarts the app within a few seconds."
 }
 
+cmd_set_email() {
+  local key from
+  echo "Email notifications go through Brevo (brevo.com). First, in Brevo: create a free account, add and verify"
+  echo "the sender address under Senders & IPs, and create an API key under SMTP & API → API Keys."
+  read -rsp "Brevo API key (xkeysib-…; leave blank to turn email off): " key; echo
+  if [ -n "$key" ]; then
+    read -rp "Sender, verified in Brevo (e.g. Veridium <noreply@yourdomain>): " from
+    [ -n "$from" ] || die "A sender is required"
+  fi
+  set_secret veridium-brevo-api-key "$key"
+  set_secret veridium-email-from "${from:-}"
+  echo "Saved. The VM restarts the app within a few seconds; its log says \"Email notifications: on (Brevo)\"."
+}
+
 cmd_deploy() {
   g compute instances add-metadata "$NAME" --zone "$ZONE" --metadata "veridium-branch=$BRANCH,veridium-deploy=$(date -u +%Y%m%dT%H%M%SZ)" >/dev/null
   echo "Deploy requested ($BRANCH). The VM pulls, installs and restarts; this takes a minute or two."
@@ -173,8 +188,9 @@ cmd_status() {
 case "${1:-}" in
   create) cmd_create ;;
   set-key) cmd_set_key ;;
+  set-email) cmd_set_email ;;
   deploy) cmd_deploy ;;
   verify) cmd_verify ;;
   status) cmd_status ;;
-  *) sed -n '2,12p' "$0"; exit 1 ;;
+  *) sed -n '2,13p' "$0"; exit 1 ;;
 esac

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type Database from 'better-sqlite3';
+import type { Mailer } from './email';
 
 export interface Notification {
   id: string;
@@ -21,12 +22,43 @@ interface Row {
 
 const KEEP = 100; // per account; older ones are pruned
 
-/** Creates notifications for the right accounts when something happens, and serves them back. */
+/**
+ * Creates notifications for the right accounts when something happens, and serves them back.
+ * With a mailer, each one is also emailed to accounts that haven't turned email notifications off.
+ */
 export class Notifier {
+  private sending = new Set<Promise<void>>();
+
   constructor(
     private db: Database.Database,
+    private mailer: Mailer | null = null,
     private now: () => Date = () => new Date(),
   ) {}
+
+  /** Whether notification emails can be sent at all (an email service is configured). */
+  get emailEnabled(): boolean {
+    return !!this.mailer;
+  }
+
+  /** Resolves once every email started so far has been sent or has failed. */
+  async idle(): Promise<void> {
+    await Promise.all([...this.sending]);
+  }
+
+  // Emails go out in the background: a slow or failing email service never fails the request.
+  private email(userIds: string[], text: string, link: string) {
+    if (!this.mailer || !userIds.length) return;
+    const rows = this.db
+      .prepare(`SELECT email FROM users WHERE email_notifications = 1 AND id IN (${userIds.map(() => '?').join(',')})`)
+      .all(...userIds) as Array<{ email: string }>;
+    const subject = `Veridium: ${text.length > 90 ? text.slice(0, 89) + '…' : text}`;
+    for (const { email } of rows) {
+      const p = this.mailer.send({ to: email, subject, text, link })
+        .catch((err) => console.error(`notification email failed: ${(err as Error).message}`))
+        .finally(() => this.sending.delete(p));
+      this.sending.add(p);
+    }
+  }
 
   private add(userIds: string[], type: string, text: string, link: string) {
     const insert = this.db.prepare(
@@ -41,6 +73,7 @@ export class Notifier {
       insert.run(randomUUID(), userId, type, text, link, at);
       prune.run(userId, userId);
     }
+    this.email([...new Set(userIds)], text, link);
   }
 
   private orgAdmins(orgId: string): string[] {

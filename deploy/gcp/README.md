@@ -41,13 +41,15 @@ so nothing needs installing and no keys leave Google.
 | Task | Command (in Cloud Shell, from the repo folder) |
 |---|---|
 | New Riot key (dev keys expire every 24h) | `bash deploy/gcp/veridium-gcp.sh set-key` |
+| Turn on email notifications (Brevo) | `bash deploy/gcp/veridium-gcp.sh set-email` |
 | Deploy the latest code | `bash deploy/gcp/veridium-gcp.sh deploy` |
 | Address, health, recent logs | `bash deploy/gcp/veridium-gcp.sh status` |
 
-The Riot key, site password, contact email, staff emails and domain can also be changed without any
+The Riot key, site password, contact email, staff emails, email settings and domain can also be changed without any
 command: Compute Engine → VM instances → `veridium` → Edit → Metadata, edit `veridium-riot-api-key`,
 `veridium-site-password`, `veridium-contact-email`, `veridium-admin-emails` (who can verify
-organizations) or `veridium-domain`, and Save. The VM applies the change and restarts
+organizations and approve tournament organizers), `veridium-brevo-api-key` and `veridium-email-from`
+(email notifications) or `veridium-domain`, and Save. The VM applies the change and restarts
 the app within seconds.
 
 ## How it works

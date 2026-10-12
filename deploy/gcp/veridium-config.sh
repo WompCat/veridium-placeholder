@@ -4,6 +4,8 @@
 #   veridium-site-password  SITE_PASSWORD (whole-site password; keep it set until launch)
 #   veridium-contact-email  CONTACT_EMAIL (shown on the Privacy Policy and Terms)
 #   veridium-admin-emails   ADMIN_EMAILS (your account email(s): Veridium staff, can verify organizations)
+#   veridium-brevo-api-key  BREVO_API_KEY (email notifications; off until this and the sender are set)
+#   veridium-email-from     EMAIL_FROM (a sender verified in Brevo, e.g. Veridium <noreply@yourdomain>)
 #   veridium-domain         the site's hostname for HTTPS (default: <external-ip>.sslip.io)
 #   veridium-branch         branch to run (default: main)
 #   veridium-deploy         change it (e.g. to a timestamp) to pull the latest code and restart
@@ -32,9 +34,10 @@ quoted() {
 }
 
 write_env() {
-  local tmp riot site contact admins
+  local tmp riot site contact admins brevo from host
   riot=$(quoted veridium-riot-api-key) && site=$(quoted veridium-site-password) && contact=$(quoted veridium-contact-email) \
-    && admins=$(quoted veridium-admin-emails) || return 1
+    && admins=$(quoted veridium-admin-emails) && brevo=$(quoted veridium-brevo-api-key) && from=$(quoted veridium-email-from) || return 1
+  host=$(site_host) || host=
   tmp=$(mktemp "$CONF/.env.XXXXXX")
   chmod 600 "$tmp"   # secrets: readable by root only (systemd reads it before dropping privileges)
   {
@@ -47,6 +50,9 @@ write_env() {
     echo "SITE_PASSWORD=$site"
     echo "CONTACT_EMAIL=$contact"
     echo "ADMIN_EMAILS=$admins"
+    echo "BREVO_API_KEY=$brevo"
+    echo "EMAIL_FROM=$from"
+    echo "SITE_URL=${host:+https://$host}"   # for links in emails
   } > "$tmp"
   mv "$tmp" "$ENV_FILE"
 }

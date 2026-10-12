@@ -136,6 +136,11 @@
           <button class="btn primary" style="margin-top:10px">Save</button>
           <div class="form-msg" id="lftMsg" role="status"></div>
         </form>
+        <form class="linkbox" id="email" tabindex="-1">
+          <label class="agree" style="font-size:14px"><input type="checkbox" name="enabled" />
+            <span><b>Email me my notifications</b><br><span class="sub" id="emailSub">Applications, roster changes and tournament results, sent to your account email as well as the bell.</span></span></label>
+          <div class="form-msg" id="emailMsg" role="status"></div>
+        </form>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <a class="btn primary" id="continueBtn" href="/">Continue</a>
           <a class="btn" href="organizations.html#create">Create an organization</a>
@@ -272,6 +277,8 @@
     $('lftForm').hidden = !me;
     $('lftForm').lookingForTeam.checked = !!account.lookingForTeam;
     $('lftForm').roles.value = account.lftRoles ?? '';
+    $('email').enabled.checked = account.emailNotifications !== false;
+    if (account.emailAvailable === false) $('emailSub').textContent = 'Applications, roster changes and tournament results, sent to your account email as well as the bell. Email isn\'t switched on for this site yet; your choice is saved for when it is.';
     $('continueBtn').href = destination(account);
     $('continueBtn').textContent = nextUrl ? 'Continue' : me ? 'Go to my profile' : 'Go to home';
     if (location.hash === '#link' && !me) $('linkForm').riotId.focus();
@@ -288,6 +295,18 @@
       setMsg($('lftMsg'), err.message, 'error');
     }
   });
+
+  $('email').enabled.addEventListener('change', async (e) => {
+    try {
+      const { user } = await api('/api/auth/me/email-notifications', { method: 'PUT', body: { enabled: e.target.checked } });
+      Veridium.signedIn(user);
+      setMsg($('emailMsg'), user.emailNotifications ? 'Saved: notifications will also be emailed.' : 'Saved: no more notification emails.', 'ok');
+    } catch (err) {
+      e.target.checked = !e.target.checked;
+      setMsg($('emailMsg'), err.message, 'error');
+    }
+  });
+  $('email').addEventListener('submit', (e) => e.preventDefault());
 
   $('deleteForm').addEventListener('submit', async (e) => {
     e.preventDefault();
