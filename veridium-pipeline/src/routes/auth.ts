@@ -37,7 +37,7 @@ function accountView(deps: AuthDeps, user: User) {
 }
 
 /** The Riot ID's PUUID: from the cache, or loaded from Riot (which also verifies the account exists). */
-async function resolveRiotId(deps: AuthDeps, riotId: string, region: string): Promise<string> {
+export async function resolveRiotId(deps: AuthDeps, riotId: string, region: string): Promise<string> {
   if (!isPlatform(region)) throw badRequest(`Unknown region "${region}"`);
   const { gameName, tagLine } = parseRiotId(riotId);
   const cached = deps.store.findPlayer(gameName, tagLine, region);

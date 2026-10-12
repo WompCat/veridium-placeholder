@@ -102,6 +102,33 @@ export class Notifier {
       `org.html?id=${encodeURIComponent(orgId)}`);
   }
 
+  /** Tells Veridium staff (accounts whose email is in ADMIN_EMAILS) about a new organizer application. */
+  organizerApplied(adminEmails: string[], name: string) {
+    if (!adminEmails.length) return;
+    const ids = (this.db
+      .prepare(`SELECT id FROM users WHERE lower(email) IN (${adminEmails.map(() => '?').join(',')})`)
+      .all(...adminEmails) as Array<{ id: string }>).map((r) => r.id);
+    this.add(ids, 'organizer.applied', `${name} applied to be a tournament organizer.`, 'admin.html');
+  }
+
+  organizerDecided(userId: string, name: string, status: 'approved' | 'rejected') {
+    this.add([userId], `organizer.${status}`, status === 'approved'
+      ? `Veridium approved ${name} as a tournament organizer. You can now post results.`
+      : `Veridium didn't approve ${name} as a tournament organizer.`, 'organizer.html');
+  }
+
+  tournamentResult(puuid: string, tournament: string, placement: number, organizer: string) {
+    const ord = (n: number) => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th');
+    this.add(this.playerAccount(puuid), 'tournament.result', `${organizer} recorded your ${ord(placement)} place at ${tournament}.`,
+      this.playerLink(puuid, '#tournaments'));
+  }
+
+  resultReported(organizerUserId: string, puuid: string, tournament: string) {
+    const player = this.db.prepare('SELECT game_name FROM players WHERE puuid = ?').get(puuid) as { game_name: string } | undefined;
+    this.add([organizerUserId], 'tournament.reported', `${player?.game_name ?? 'A player'} said a result at ${tournament} isn't theirs. It's hidden from their profile; check and fix it.`,
+      'organizer.html');
+  }
+
   // ---- Reading ----
 
   list(userId: string, limit = 20): { unread: number; items: Notification[] } {

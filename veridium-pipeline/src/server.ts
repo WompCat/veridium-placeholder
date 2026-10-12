@@ -10,6 +10,8 @@ import { legalInfo } from './legal';
 import { FollowRepo } from './follows';
 import { Notifier } from './notifications';
 import { TeamHistoryRepo } from './teams';
+import { TournamentRepo } from './tournaments/repo';
+import { adminRouter, organizersRouter, playerTournamentsRouter, tournamentsRouter } from './routes/tournaments';
 import { RiotClient } from './riot/client';
 import { OrgRepo } from './orgs/repo';
 import {
@@ -57,7 +59,7 @@ export function createApp(
   const auth = opts.auth ?? new AuthRepo(deps.store.db);
   app.use(sessions(auth));
   app.use('/api/players', playersRouter(deps));
-  const orgDeps = { ...deps, orgs, auth, notifier: new Notifier(deps.store.db), follows: new FollowRepo(deps.store.db), teams: new TeamHistoryRepo(deps.store.db), adminEmails: opts.adminEmails ?? config.adminEmails };
+  const orgDeps = { ...deps, orgs, auth, notifier: new Notifier(deps.store.db), follows: new FollowRepo(deps.store.db), teams: new TeamHistoryRepo(deps.store.db), tournaments: new TournamentRepo(deps.store.db), adminEmails: opts.adminEmails ?? config.adminEmails };
   app.use('/api/auth', authRouter(orgDeps));
   app.use('/api/players', playerApplicationsRouter(orgDeps));
   app.use('/api/organizations', organizationsRouter(orgDeps));
@@ -66,6 +68,10 @@ export function createApp(
   app.use('/api/feed', feedRouter(orgDeps));
   app.use('/api/notifications', notificationsRouter(orgDeps));
   app.use('/api/follows', followsRouter(orgDeps));
+  app.use('/api/organizers', organizersRouter(orgDeps));
+  app.use('/api/admin', adminRouter(orgDeps));
+  app.use('/api/tournaments', tournamentsRouter(orgDeps));
+  app.use('/api/players', playerTournamentsRouter(orgDeps));
   app.get('/api/legal', (_req, res) => {
     res.json(legalInfo());
   });

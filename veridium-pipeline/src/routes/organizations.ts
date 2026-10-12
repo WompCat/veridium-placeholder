@@ -4,6 +4,7 @@ import type { AuthRepo } from '../auth/repo';
 import type { FollowRepo, FollowTarget } from '../follows';
 import type { Notifier } from '../notifications';
 import type { TeamHistoryRepo } from '../teams';
+import type { TournamentRepo } from '../tournaments/repo';
 import { buildFeed, listPlayerSummaries } from '../feed';
 import { parsePlayerFilters, searchPlayers } from '../players/search';
 import { badRequest, conflict, forbidden, HttpError, notFound } from '../orgs/errors';
@@ -21,6 +22,7 @@ export interface OrgDeps extends IngestDeps {
   notifier: Notifier;
   follows: FollowRepo;
   teams: TeamHistoryRepo;
+  tournaments: TournamentRepo;
   /** Veridium staff emails (ADMIN_EMAILS): they can verify organizations. */
   adminEmails: string[];
 }
