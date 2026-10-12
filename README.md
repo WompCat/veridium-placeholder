@@ -172,6 +172,15 @@ any org it's the only admin of. Set `CONTACT_EMAIL` to show a contact address on
   "Everyone / Following" tabs.
 - **Team history** on the profile's Teams tab, in two tiers: stints on a Veridium org's roster
   (verified by the org) and self-reported teams (labelled as such).
+- **Tournament results**, the third tier. Anyone can apply to be a tournament organizer
+  (`organizer.html`, also in the account menu). Staff approve or reject applications on `admin.html`.
+  Approved organizers record finished tournaments and placements by Riot ID. Results show on the
+  Tournaments page (with podiums) and on the player's Teams tab. Players are notified and can mark
+  a result "Not me", which hides it from their profile and tells the organizer.
+- **Email notifications:** every bell notification is also emailed through Brevo, unless the account
+  turns it off in Account settings. Off for the whole site until `BREVO_API_KEY` and `EMAIL_FROM`
+  are set. `SITE_URL` makes the links in emails absolute. A failed email is logged and never fails a
+  request.
 
 **Under-18 flag.** Applying shows an optional, self-reported "I am under 18" checkbox (a yes/no,
 never a birthdate). It's stored on that application only (`applications.under_18`) and returned only
@@ -239,6 +248,16 @@ their profile.
 | `GET` · `PUT` · `DELETE /api/follows/:type/:id` | `type` is `player` (id = PUUID) or `org`: follower count and whether you follow · follow · unfollow |
 | `GET /api/players/:region/:riotId/teams` | team history: `{ veridium, selfReported }` |
 | `POST` · `DELETE /api/players/:region/:riotId/teams[/:id]` | the player's own account: add `{ team, role?, game?, started, ended? }` (YYYY-MM) · remove |
+| `PUT /api/auth/me/email-notifications` | `{ enabled }`: email copies of your notifications |
+| `GET /api/organizers/me` · `POST /api/organizers` | your organizer profile and its status · apply: `{ name, website?, description? }` |
+| `GET /api/organizers/:id` | an approved organizer's public profile and tournaments |
+| `GET /api/admin/organizers?status=` · `POST /api/admin/organizers/:id` | Veridium staff: applications with the applicant's email · `{ status: approved \| rejected }` |
+| `GET /api/tournaments` · `GET /api/tournaments/mine` | approved organizers' tournaments, newest first, with the top 3 · your own |
+| `GET /api/tournaments/:id` | a tournament and its results (its organizer also sees results marked "Not me") |
+| `POST /api/tournaments` · `DELETE /api/tournaments/:id` | approved organizers: `{ name, game, date (YYYY-MM-DD, not in the future), region?, url? }` · delete their own |
+| `POST /api/tournaments/:id/results` · `DELETE …/results/:resultId` | the tournament's organizer: `{ riotId, region? = na1, placement, team? }` · remove |
+| `POST /api/tournaments/results/:resultId/not-me` | the player's own account: hide a result and notify the organizer |
+| `GET /api/players/:region/:riotId/tournaments` | a player's visible results |
 | `GET /api/players/:region/:riotId/lol` | League of Legends ranked profile for the current season (`?cached=1` for cache only) |
 | `GET /api/feed?limit=&following=1` | home feed (`following=1`: only players and orgs you follow): TFT and League of Legends sessions (one per player per game per day; LoL remakes left out), roster joins, vacancies |
 
@@ -306,6 +325,9 @@ between requests. The repo is set up for [Render](https://render.com):
 | `SEASONS` | `3` |
 | `SITE_PASSWORD` | puts the whole site behind a browser password prompt. Recommended while Riot ID ownership isn't verified |
 | `CONTACT_EMAIL` | the address shown on the Privacy Policy and Terms for privacy and account requests |
+| `ADMIN_EMAILS` | your account email(s): Veridium staff, who verify organizations and approve tournament organizers |
+| `BREVO_API_KEY`, `EMAIL_FROM` | email notifications (optional). Create a free Brevo account, verify a sender address under Senders, and create an API key. `EMAIL_FROM` is that sender, e.g. `Veridium <noreply@yourdomain>` |
+| `SITE_URL` | the site's address, e.g. `https://veridium.onrender.com`, for links in emails |
 | `PORT` | injected by Render; the app reads `process.env.PORT` (4000 is only the local default) |
 | `HOST` | `0.0.0.0` by default, so Render can route traffic in |
 

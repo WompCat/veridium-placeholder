@@ -40,6 +40,10 @@
 <script>
   let status = 'pending';
   async function load() {
+    if (!Veridium.getAccount()) {
+      $('list').innerHTML = `<div class="empty">This page is for Veridium staff. <a href="${esc(Veridium.loginHref())}">Log in</a></div>`;
+      return;
+    }
     let list;
     try { list = await api(`/api/admin/organizers?status=${status}`); }
     catch (err) { $('list').innerHTML = `<div class="empty">${esc(err.message)}</div>`; return; }

@@ -139,8 +139,8 @@
       <div id="players"></div>
     </section>
     <section class="card pad">
-      <div class="section-head"><h2>Upcoming Tournaments</h2><span class="placeholder-tag">Coming soon</span></div>
-      <div class="sub">Verified tournament results and brackets are on the roadmap. <a href="tournaments.html">Learn more</a></div>
+      <div class="section-head"><h2>Recent Tournaments</h2><a href="tournaments.html">View all →</a></div>
+      <div id="tournaments"></div>
     </section>
     <section class="card pad">
       <div class="section-head"><h2>Games on Veridium</h2></div>
@@ -434,7 +434,13 @@
 
   // ---- Right column ----
   async function renderRight() {
-    const [vacancies, players] = await Promise.all([api('/api/vacancies').catch(() => []), api('/api/players').catch(() => [])]);
+    const [vacancies, players, tournaments] = await Promise.all([api('/api/vacancies').catch(() => []), api('/api/players').catch(() => []), api('/api/tournaments').catch(() => [])]);
+    $('tournaments').innerHTML = tournaments.length ? tournaments.slice(0, 3).map((t) => `
+      <div class="row-item">
+        <span class="org-chip" style="width:38px;height:38px;font-size:16px" aria-hidden="true">🏆</span>
+        <div class="grow"><b>${esc(t.name)}</b><span class="sub">${esc(t.game)} · ${esc(t.organizerName)}${t.podium?.[0] ? ` · 1st ${esc(name(t.podium[0].player.riotId))}` : ''}</span></div>
+        <a class="btn small" href="tournaments.html?id=${encodeURIComponent(t.id)}">View</a>
+      </div>`).join('') : '<div class="sub">No results yet. Organizers record them once Veridium approves them. <a href="organizer.html">Run tournaments?</a></div>';
     $('vacancies').innerHTML = vacancies.length ? vacancies.slice(0, 4).map((v) => `
       <div class="row-item">
         <span class="org-chip" style="width:38px;height:38px;font-size:13px">${esc(initials(v.organizationName))}</span>
