@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tournament organizer · Veridium</title>
+<link rel="icon" href="data:," />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="app.css" />
+<style>
+  main.dir { grid-template-columns: minmax(0, 1fr); max-width: 1000px; }
+  h1.page { font-size: 26px; margin: 0 0 4px; }
+  .field textarea { border: 1px solid var(--border); background: var(--bg); border-radius: 9px; padding: 8px 10px; font: inherit; font-size: 13px; color: var(--text); min-height: 70px; resize: vertical; }
+  .t-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .t-head h2 { margin: 0; font-size: 17px; }
+  .t-meta { color: var(--muted); font-size: 12px; }
+  .hidden-row { opacity: .6; }
+  #mine > .card { min-width: 0; }
+  #mine td { white-space: normal; }
+  #mine td:last-child { text-align: right; } /* let the results table scroll instead of widening the page */
+  .steps { margin: 8px 0 0; padding-left: 20px; color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body data-page="tournaments">
+<header id="site-header"></header>
+<main class="dir" id="main">
+  <section class="card pad empty">Loading…</section>
+</main>
+<script src="shell.js"></script>
+<script src="common.js"></script>
+<script>
+  const day = (d) => new Date(d + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  const today = new Date().toISOString().slice(0, 10);
+  const show = (html) => { $('main').innerHTML = html; };
+  const formData = (form) => Object.fromEntries([...new FormData(form)].filter(([, v]) => v !== ''));
+
+  const about = `<ol class="steps">
+      <li>Apply below with your organization's name and website.</li>
+      <li>Veridium's staff check that you run real tournaments, usually within a few days. You'll get a notification.</li>
+      <li>Once approved, record each tournament and its placements by Riot ID. They appear on the players' profiles, and
+        a player can mark a result "Not me" if it isn't theirs.</li></ol>`;
+
+  async function load() {
+    const account = Veridium.getAccount();
+    if (!account) {
+      show(`<section class="card pad"><h1 class="page">Tournament organizers</h1>
+        <div class="sub">Record verified tournament results on players' profiles.</div>${about}
+        <div style="margin-top:16px"><a class="btn primary" href="${esc(Veridium.loginHref())}">Log in to apply</a></div></section>`);
+      return;
+    }
+    const { organizer } = await api('/api/organizers/me');
+    if (!organizer) return applyView();
+    if (organizer.status === 'pending') {
+      show(`<section class="card pad"><h1 class="page">${esc(organizer.name)} <span class="pill">Waiting for approval</span></h1>
+        <div class="sub">You applied ${esc(fmtDate(organizer.createdAt))}. Veridium's staff will review it, and you'll get a
+          notification when they decide.</div></section>`);
+      return;
+    }
+    if (organizer.status === 'rejected') {
+      show(`<section class="card pad"><h1 class="page">${esc(organizer.name)}</h1>
+        <div class="sub">Veridium couldn't approve this organizer profile. If you think that's a mistake, contact us using
+          the address in our <a href="privacy.html#contact">Privacy Policy</a>.</div></section>`);
+      return;
+    }
+    return dashboard(organizer);
+  }
+
+  function applyView() {
+    show(`<section class="card pad"><h1 class="page">Become a tournament organizer</h1>
+        <div class="sub">Record verified tournament results on players' profiles.</div>${about}</section>
+      <section class="card pad"><h2>Apply</h2>
+        <form class="form-row" id="applyForm">
+          <label class="field" style="flex:1 1 220px">Organizer name<input name="name" maxlength="80" required placeholder="e.g. Pacific Clash" /></label>
+          <label class="field" style="flex:1 1 220px">Website<input name="website" type="url" maxlength="200" placeholder="https://" /></label>
+          <label class="field" style="flex-basis:100%">About your tournaments (optional)<textarea name="description" maxlength="500" placeholder="Which games, how often, where results are published…"></textarea></label>
+          <button class="btn primary">Apply</button>
+          <div class="form-msg" id="applyMsg" role="alert" style="flex-basis:100%"></div>
+        </form></section>`);
+    $('applyForm').onsubmit = async (e) => {
+      e.preventDefault();
+      try { await api('/api/organizers', { method: 'POST', body: formData(e.target) }); load(); }
+      catch (err) { setMsg($('applyMsg'), err.message, 'error'); }
+    };
+  }
+
+  async function dashboard(o) {
+    const mine = await api('/api/tournaments/mine');
+    show(`<section class="card pad"><div class="t-head">
+        <div><h1 class="page">${esc(o.name)} <span class="pill">Approved organizer</span></h1>
+          <div class="sub">Record your tournaments and placements. Players are notified when you add their result.</div></div>
+        <a class="btn" href="tournaments.html?organizer=${encodeURIComponent(o.id)}">Public page</a></div></section>
+      <section class="card pad"><h2>Add a tournament</h2>
+        <form class="form-row" id="newForm">
+          <label class="field" style="flex:2 1 220px">Name<input name="name" maxlength="100" required placeholder="e.g. Autumn Open 2026" /></label>
+          <label class="field">Game<select name="game" required><option>TFT</option><option>League of Legends</option><option>Valorant</option><option>Other</option></select></label>
+          <label class="field">Date<input name="date" type="date" max="${today}" required /></label>
+          <label class="field">Region<input name="region" maxlength="20" placeholder="e.g. NA" /></label>
+          <label class="field" style="flex:2 1 220px">Link to results (optional)<input name="url" type="url" maxlength="300" placeholder="https://" /></label>
+          <button class="btn primary">Add tournament</button>
+          <div class="form-msg" id="newMsg" role="alert" style="flex-basis:100%"></div>
+        </form></section>
+      <div class="list" id="mine">${mine.length ? '' : '<div class="card pad empty">No tournaments yet.</div>'}</div>`);
+    $('newForm').onsubmit = async (e) => {
+      e.preventDefault();
+      try { const t = await api('/api/tournaments', { method: 'POST', body: formData(e.target) }); location.hash = `t-${t.id}`; dashboard(o); }
+      catch (err) { setMsg($('newMsg'), err.message, 'error'); }
+    };
+    for (const t of mine) {
+      const el = document.createElement('section');
+      el.className = 'card pad';
+      el.id = `t-${t.id}`;
+      $('mine').append(el);
+      renderTournament(el, t.id);
+    }
+    document.getElementById(location.hash.slice(1))?.scrollIntoView();
+  }
+
+  async function renderTournament(el, id) {
+    const t = await api(`/api/tournaments/${encodeURIComponent(id)}`);
+    const rows = t.results.map((r) => `<tr class="${r.hidden ? 'hidden-row' : ''}">
+        <td><b>${r.placement}</b></td><td><a href="${profileUrl(r.player)}">${esc(r.player.riotId)}</a>${r.hidden ? '<div class="t-meta">Player said "Not me": hidden from their profile</div>' : ''}</td>
+        <td>${esc(r.team ?? '—')}</td>
+        <td><button class="btn small" data-del="${esc(r.id)}" aria-label="Remove ${esc(r.player.riotId)}">Remove</button></td></tr>`).join('');
+    el.innerHTML = `<div class="t-head"><div><h2><a href="tournaments.html?id=${encodeURIComponent(t.id)}">${esc(t.name)}</a></h2>
+        <div class="t-meta">${[t.game, t.region, day(t.date)].filter(Boolean).map(esc).join(' · ')}</div></div>
+        <button class="btn small" data-delete-t>Delete tournament</button></div>
+      ${rows ? `<div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>Place</th><th>Player</th><th>Team</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
+        : '<div class="sub" style="margin-top:8px">No results yet.</div>'}
+      <form class="form-row" data-add style="margin-top:14px;border-top:1px dashed var(--border);padding-top:14px">
+        <label class="field" style="flex:2 1 180px">Riot ID<input name="riotId" required placeholder="Name#TAG" /></label>
+        <label class="field" style="flex:0 1 100px">Region<select name="region">${regionOptions('na1')}</select></label>
+        <label class="field" style="flex:0 1 90px">Place<input name="placement" type="number" min="1" max="999" required /></label>
+        <label class="field">Team (optional)<input name="team" maxlength="60" /></label>
+        <button class="btn primary">Add result</button>
+        <div class="form-msg" role="alert" style="flex-basis:100%"></div>
+      </form>`;
+    const msg = el.querySelector('.form-msg');
+    el.querySelector('[data-add]').onsubmit = async (e) => {
+      e.preventDefault();
+      const f = formData(e.target);
+      setMsg(msg, 'Looking up the player…');
+      try {
+        await api(`/api/tournaments/${encodeURIComponent(t.id)}/results`, { method: 'POST', body: { ...f, placement: Number(f.placement) } });
+        renderTournament(el, t.id);
+      } catch (err) { setMsg(msg, err.message, 'error'); }
+    };
+    el.querySelector('[data-delete-t]').onclick = async () => {
+      if (!confirm(`Delete "${t.name}" and all its results?`)) return;
+      try { await fetch(`/api/tournaments/${encodeURIComponent(t.id)}`, { method: 'DELETE' }); el.remove(); }
+      catch (err) { setMsg(msg, err.message, 'error'); }
+    };
+    el.querySelectorAll('[data-del]').forEach((b) => { b.onclick = async () => {
+      if (!confirm('Remove this result?')) return;
+      const res = await fetch(`/api/tournaments/${encodeURIComponent(t.id)}/results/${encodeURIComponent(b.dataset.del)}`, { method: 'DELETE' });
+      if (res.ok) renderTournament(el, t.id); else setMsg(msg, 'Could not remove it', 'error');
+    }; });
+  }
+
+  load().catch((err) => show(`<section class="card pad empty">${esc(err.message)}</section>`));
+</script>
+</body>
+</html>

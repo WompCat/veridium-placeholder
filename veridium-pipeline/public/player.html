@@ -234,10 +234,10 @@
         <div class="form-msg" id="teamMsg" role="alert" style="flex-basis:100%"></div>
       </form>
     </section>
-    <section class="card pad soon" data-view="tournaments" hidden>
-      <div class="icon" aria-hidden="true">🏆</div>
-      <h2>Tournament results are coming soon</h2>
-      <div class="sub">Verified placements from official tournaments will show up here, next to ranked play.</div>
+    <section class="card pad" data-view="tournaments" hidden>
+      <h2>Tournament results</h2>
+      <div class="sub">Placements recorded by tournament organizers Veridium has approved. <a href="tournaments.html">All tournaments</a></div>
+      <div class="th-list" id="tResults" style="margin-top:8px"></div>
     </section>
 
     <!-- Stats -->
@@ -896,7 +896,29 @@
   // ---- Team history: Veridium roster stints (verified by the org) and self-reported teams ----
   const month = (ym) => { const [y, m] = ym.split('-').map(Number); return new Date(y, m - 1).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }); };
   const span = (from, to) => `${from} – ${to ?? 'present'}`;
+  // ---- Tournament results from approved organizers; the player can hide one that isn't theirs ----
+  async function loadResults(riotId, region) {
+    const own = isOwnProfile();
+    let list;
+    try { list = await fetch(`/api/players/${encodeURIComponent(region)}/${encodeURIComponent(riotId)}/tournaments`).then(jsonOrThrow); } catch { list = []; }
+    const ord = (n) => n + (['th', 'st', 'nd', 'rd'][(n % 100 > 10 && n % 100 < 14) ? 0 : n % 10] ?? 'th');
+    $('tResults').innerHTML = list.length ? list.map((r) => `<div class="th-item">
+        <b style="min-width:3em">${esc(ord(r.placement))}</b>
+        <div class="grow"><a href="tournaments.html?id=${encodeURIComponent(r.tournament.id)}"><b>${esc(r.tournament.name)}</b></a>
+          <div class="sub">${esc([r.tournament.game, r.team, `by ${r.tournament.organizerName}`].filter(Boolean).join(' · '))}</div></div>
+        <span class="when">${esc(fmtDate(r.tournament.date))}</span>
+        ${own ? `<button class="btn small" data-not-me="${esc(r.resultId)}" title="Hide this result and tell the organizer">Not me</button>` : ''}</div>`).join('')
+      : '<div class="sub">No tournament results recorded yet.</div>';
+    $('tResults').onclick = async (e) => {
+      const b = e.target.closest('[data-not-me]');
+      if (!b || !confirm('Hide this result from your profile? The organizer will be told you said it isn\'t yours.')) return;
+      try { await fetch(`/api/tournaments/results/${encodeURIComponent(b.dataset.notMe)}/not-me`, { method: 'POST' }).then(jsonOrThrow); loadResults(riotId, region); }
+      catch (err) { notice(err.message, 'error'); }
+    };
+  }
+
   async function loadTeams(riotId, region) {
+    loadResults(riotId, region);
     const path = `/api/players/${encodeURIComponent(region)}/${encodeURIComponent(riotId)}/teams`;
     const own = isOwnProfile();
     $('teamForm').hidden = !own;

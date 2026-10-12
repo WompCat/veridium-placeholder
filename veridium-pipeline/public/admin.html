@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Staff · Veridium</title>
+<link rel="icon" href="data:," />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="app.css" />
+<style>
+  main.dir { grid-template-columns: minmax(0, 1fr); max-width: 1000px; }
+  h1.page { font-size: 26px; margin: 0 0 4px; }
+  .o-row { display: flex; gap: 14px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .o-row:last-child { border-bottom: 0; }
+  .o-row .grow { flex: 1 1 260px; min-width: 0; overflow-wrap: anywhere; }
+  .o-row p { margin: 6px 0 0; font-size: 13px; }
+  .actions { display: flex; gap: 8px; }
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .tabs button[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+</style>
+</head>
+<body data-page="admin">
+<header id="site-header"></header>
+<main class="dir">
+  <section class="card pad">
+    <h1 class="page">Tournament organizers</h1>
+    <div class="sub">Approve organizers who really run tournaments. Their results appear on players' profiles once approved.
+      Check the website and the applicant's email before deciding.</div>
+    <div class="tabs" id="tabs">
+      <button class="btn small" data-status="pending" aria-pressed="true">Pending</button>
+      <button class="btn small" data-status="approved" aria-pressed="false">Approved</button>
+      <button class="btn small" data-status="rejected" aria-pressed="false">Rejected</button>
+    </div>
+  </section>
+  <section class="card pad" id="list"><div class="empty">Loading…</div></section>
+</main>
+<script src="shell.js"></script>
+<script src="common.js"></script>
+<script>
+  let status = 'pending';
+  async function load() {
+    let list;
+    try { list = await api(`/api/admin/organizers?status=${status}`); }
+    catch (err) { $('list').innerHTML = `<div class="empty">${esc(err.message)}</div>`; return; }
+    $('list').innerHTML = list.length ? list.map((o) => `<div class="o-row">
+        <div class="grow"><b>${esc(o.name)}</b>
+          <div class="sub">${esc(o.email ?? 'deleted account')} · applied ${esc(fmtDate(o.createdAt))}${o.decidedAt ? ` · decided ${esc(fmtDate(o.decidedAt))}` : ''}</div>
+          ${o.website ? `<p><a href="${esc(o.website)}" target="_blank" rel="noopener nofollow">${esc(o.website)}</a></p>` : '<p class="sub">No website given</p>'}
+          ${o.description ? `<p>${esc(o.description)}</p>` : ''}</div>
+        <div class="actions">
+          ${o.status !== 'approved' ? `<button class="btn small primary" data-id="${esc(o.id)}" data-decide="approved">Approve</button>` : ''}
+          ${o.status !== 'rejected' ? `<button class="btn small" data-id="${esc(o.id)}" data-decide="rejected">${o.status === 'approved' ? 'Revoke' : 'Reject'}</button>` : ''}
+        </div></div>`).join('')
+      : `<div class="empty">No ${status} organizers.</div>`;
+  }
+  $('list').onclick = async (e) => {
+    const b = e.target.closest('[data-decide]');
+    if (!b) return;
+    if (b.dataset.decide === 'rejected' && !confirm('Their results will stop showing on players\' profiles. Continue?')) return;
+    b.disabled = true;
+    try { await api(`/api/admin/organizers/${encodeURIComponent(b.dataset.id)}`, { method: 'POST', body: { status: b.dataset.decide } }); load(); }
+    catch (err) { alert(err.message); b.disabled = false; }
+  };
+  $('tabs').onclick = (e) => {
+    const b = e.target.closest('[data-status]');
+    if (!b) return;
+    status = b.dataset.status;
+    $('tabs').querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    load();
+  };
+  load();
+</script>
+</body>
+</html>

@@ -42,8 +42,8 @@
   function cacheAccount(user) {
     try {
       if (user) {
-        const { email, player, adminOf, termsAccepted, lookingForTeam, lftRoles } = user;
-        localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ email, player, adminOf, termsAccepted, lookingForTeam, lftRoles }));
+        const { email, player, adminOf, termsAccepted, lookingForTeam, lftRoles, siteAdmin } = user;
+        localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ email, player, adminOf, termsAccepted, lookingForTeam, lftRoles, siteAdmin }));
       }
       else localStorage.removeItem(ACCOUNT_KEY);
     } catch {}
@@ -206,6 +206,8 @@
         ${me ? `<a role="menuitem" href="${playerHref(me.riotId, me.region)}">My profile</a>`
           : '<a role="menuitem" href="login.html#link">Link your Riot ID</a>'}
         ${orgs.map((o) => `<a role="menuitem" href="org.html?id=${encodeURIComponent(o.id)}">${escape(o.name)} <small>Admin</small></a>`).join('')}
+        <a role="menuitem" href="organizer.html">Tournament organizer</a>
+        ${account.siteAdmin ? '<a role="menuitem" href="admin.html">Staff: review organizers</a>' : ''}
         <a role="menuitem" href="login.html">Account settings</a>
         <button role="menuitem" type="button" id="logoutBtn">Log out</button>
       </div>
