@@ -87,6 +87,9 @@ export function createApp(
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (!config.riotApiKey) console.warn('RIOT_API_KEY is not set: profile requests will fail until it is added to .env');
+  if (process.env.NODE_ENV === 'production' && !config.sitePassword) {
+    console.warn('SITE_PASSWORD is not set: the site is public. Riot only allows a development key on a private prototype, so keep a password until a production key is approved.');
+  }
   const deps: IngestDeps = {
     client: new RiotClient({ apiKey: config.riotApiKey }),
     store: new Store(config.dbPath),

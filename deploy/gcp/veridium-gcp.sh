@@ -84,7 +84,9 @@ cmd_create() {
   local riot site contact admins
   read -rsp "Riot API key (RGAPI-…): " riot; echo
   [ -n "$riot" ] || die "A Riot API key is required (developer.riotgames.com)"
-  read -rsp "Site password (no ' quotes; leave blank to skip, not recommended): " site; echo
+  # Riot's policy: a development key is only for a private prototype, not a site the community can use.
+  read -rsp "Site password (required while you're on a Riot development key; no ' quotes): " site; echo
+  [ -n "$site" ] || die "Set a site password: Riot only allows a development key on a private prototype. Remove it after Riot approves a production key."
   read -rp  "Contact email for the Privacy Policy (optional): " contact
   read -rp  "Your Veridium account email, to verify organizations (optional, can be set later): " admins
 

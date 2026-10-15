@@ -26,7 +26,8 @@ so nothing needs installing and no keys leave Google.
    - 10 GB boot disk plus 10 GB data disk, both standard (the free tier covers 30 GB);
    - a static IP and a firewall rule for HTTP and HTTPS.
 
-   Then it asks for confirmation, your Riot key, a site password and an optional contact email.
+   Then it asks for confirmation, your Riot key, a site password (required: Riot only allows a
+   development key on a private prototype) and an optional contact email.
    The VM installs everything on first boot (5–10 minutes) and the script waits until the site answers
    at `https://<ip-with-dashes>.sslip.io/` (for IP 34.1.2.3: `https://34-1-2-3.sslip.io/`). Plain
    `http://` redirects there.
@@ -79,6 +80,10 @@ Settings live in instance metadata, which only people with access to your Google
 read. They're never in the repo.
 
 ## Before you rely on it
+
+- **Keep the site password on.** Riot only allows a development key on a private prototype, not a site
+  the community can use. Share the password only with people you invite to test, and don't remove it
+  until Riot approves a production key.
 
 - **External IP cost.** Google began charging for external IPv4 addresses in 2024. Check the current
   pricing for your VM's address (the budget alert above will catch it either way). If it's charged,

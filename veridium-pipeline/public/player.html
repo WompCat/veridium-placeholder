@@ -76,10 +76,10 @@
         <div class="avatar" id="avatar">?</div>
         <div class="who">
           <h1><span id="name">Loading…</span>
-            <svg class="check" viewBox="0 0 24 24" aria-label="Verified"><circle cx="12" cy="12" r="11" fill="#4f7bff"/><path d="M7 12.5l3.2 3.2L17 9" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <svg class="check" viewBox="0 0 24 24" role="img" aria-label="Stats from Riot's API, not self-reported"><title>Stats from Riot's API, not self-reported</title><circle cx="12" cy="12" r="11" fill="#4f7bff"/><path d="M7 12.5l3.2 3.2L17 9" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </h1>
           <div class="meta" id="meta">TFT Player</div>
-          <div class="tags" id="tags">Competitive · Ranked TFT · Verified by Riot</div>
+          <div class="tags" id="tags">Competitive · Ranked TFT · Data from Riot's API</div>
           <div id="lftBadge" hidden style="margin-top:8px"><span style="display:inline-block;background:#e7f7ee;color:#137a3e;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700"></span></div>
           <div class="banner-actions">
             <button class="ghost" id="share" type="button">🔗 Share Profile</button>
@@ -202,7 +202,7 @@
     <!-- Matches: every tracked match -->
     <section class="card pad" data-view="matches" hidden>
       <div class="table-head">
-        <div><h2>Match History</h2><div class="sub" id="allNote">Every match in the tracked seasons, verified from Riot.</div></div>
+        <div><h2>Match History</h2><div class="sub" id="allNote">Every match in the tracked seasons, from Riot's API.</div></div>
         <div class="filters">
           <select id="allSeason" aria-label="Season"></select>
           <select id="allQueue" aria-label="Queue"><option value="">All queues</option><option value="RANKED_TFT">Ranked</option><option value="NORMAL_TFT">Normal</option></select>
@@ -288,7 +288,7 @@
     </section>
     <section class="card pad">
       <h2>Verified Stats</h2>
-      <div class="sub">All stats are pulled from official Riot APIs and cannot be edited.</div>
+      <div class="sub">All stats come from Riot Games' public API and can't be edited on Veridium.</div>
       <div class="checks">
         <div><span class="tick">✓</span><span>Match History<small>Official APIs</small></span></div>
         <div><span class="tick">✓</span><span>Rank Verification<small>Real-time</small></span></div>
@@ -349,7 +349,7 @@
     };
     return {
       riotId: 'ShadowReign#NA1', region: 'na1', verified: true,
-      rank: { tier: 'DIAMOND', division: 'IV', leaguePoints: 42, percentile: 0.008 },
+      rank: { tier: 'DIAMOND', division: 'IV', leaguePoints: 42 },
       highestRank: 'DIAMOND IV', currentSet: 18, ...stats(current), recentMatches: current,
       history: { complete: true, syncing: false },
       seasons: [
@@ -606,7 +606,7 @@
     $('allMatches').innerHTML = rows.length ? rows.map((m) => `<tr><td>${fmtDate(m.date)}</td><td>${m.set}</td><td>${queueLabel(m.queueType)}</td>
       <td>${placeCell(m.placement)}</td><td>${lpCell(m)}</td><td class="dim">${esc(m.matchId)}</td></tr>`).join('')
       : '<tr><td colspan="6" class="empty">No matches for these filters.</td></tr>';
-    $('allNote').textContent = `${list.length} match${list.length === 1 ? '' : 'es'}, verified from Riot.`;
+    $('allNote').textContent = `${list.length} match${list.length === 1 ? '' : 'es'}, from Riot's API.`;
     const more = $('allMore');
     more.hidden = list.length <= view.allShown;
     more.innerHTML = `Show ${Math.min(ALL_PAGE, list.length - view.allShown)} more <span class="chev">▾</span>`;
@@ -761,16 +761,15 @@
     if (lolView) {
       const solo = view.lol.ranks.solo;
       $('meta').textContent = `League of Legends Player · ${p.region.toUpperCase()} · #${tag}`;
-      $('tags').textContent = 'Competitive · Ranked Solo/Duo · Verified by Riot';
+      $('tags').textContent = "Competitive · Ranked Solo/Duo · Data from Riot's API";
       $('rankText').textContent = solo ? rankName(solo) : 'Unranked';
       $('rankSub').textContent = solo ? `LoL Solo/Duo · ${solo.leaguePoints} LP` : 'LoL Solo/Duo';
       return;
     }
     $('meta').textContent = `TFT Player · ${p.region.toUpperCase()} · #${tag}`;
-    $('tags').textContent = 'Competitive · Ranked TFT · Verified by Riot';
+    $('tags').textContent = "Competitive · Ranked TFT · Data from Riot's API";
     $('rankText').textContent = p.rank ? rankName(p.rank) : 'Unranked';
-    $('rankSub').textContent = !p.rank ? 'TFT Ranked'
-      : p.rank.percentile != null ? `TFT Ranked · Top ${pct(p.rank.percentile)}` : `TFT Ranked · ${p.rank.leaguePoints} LP`;
+    $('rankSub').textContent = p.rank ? `TFT Ranked · ${p.rank.leaguePoints} LP` : 'TFT Ranked';
   }
 
   function renderSeasonTabs() {

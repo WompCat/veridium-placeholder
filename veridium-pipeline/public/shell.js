@@ -120,7 +120,7 @@
     if (document.body.dataset.page === 'landing' || document.querySelector('.site-footer')) return;
     const el = document.createElement('footer');
     el.className = 'site-footer';
-    el.innerHTML = `<span>© ${new Date().getFullYear()} Veridium · Not endorsed by Riot Games.</span>
+    el.innerHTML = `<span>© ${new Date().getFullYear()} Veridium · An independent site using Riot Games' public API. Not endorsed by Riot Games.</span>
       <nav aria-label="Legal"><a href="privacy.html">Privacy Policy</a><a href="terms.html">Terms of Service</a></nav>`;
     document.body.append(el);
   }

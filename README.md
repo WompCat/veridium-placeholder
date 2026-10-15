@@ -278,12 +278,35 @@ CLI or tests), and each is recorded in `schema_migrations`. `001_pipeline.sql` i
 pipeline schema with `IF NOT EXISTS`, so databases from before migrations existed adopt it
 unchanged. To change the schema, add the next numbered file. Never edit one that has already shipped.
 
+### Riot developer policy
+
+Checked against Riot's "Please Don't / Please Do" developer policy (October 2026):
+
+- **Development key = private prototype.** Keep `SITE_PASSWORD` set and the audience small until
+  Riot approves a production key. Removing the password is a launch, and needs the production key first.
+  The GCP `create` command requires a password, and the server warns at startup in production without one.
+- **Key stays server-side.** Only `src/riot/client.ts` sends it, as the `X-Riot-Token` header. It's never in
+  the browser or the repository (`.env` is gitignored).
+- **Documented endpoints only:** account-v1 (by Riot ID), tft-match-v1, tft-league-v1 (by PUUID),
+  lol match-v5 and league-v4 (entries by PUUID).
+- **No home-made rating.** Ranks, LP, wins and losses are Riot's values passed through. Rank comparisons
+  only sort lists; no score, percentile or MMR is shown.
+- **No player-rates-player feature.** Org decisions on applications are private to the player and the org.
+  "Not me" only lets a player hide a result recorded for their own Riot ID. Check this rule before adding
+  anything like endorsements or reviews.
+- **No Riot logos or look-alike design.** There are no Riot or game logos; game tags are plain text.
+  The site says it's an independent site using Riot's public API and isn't endorsed by Riot Games, and
+  no copy says Riot verified, approved or partnered with Veridium.
+- **No paid features** (see Free vs paid features below).
+- **One production key per project:** a later, separate product needs its own key.
+
 ### Open decisions
 
 - **Riot ID ownership.** Linking a Riot ID isn't proven yet (needs Riot Sign On). See Accounts above.
 - **More than one admin per org.** The creator is the only admin; there's no way to invite others yet.
-- **Free vs paid vacancy postings.** There's no `plan` / `billingStatus` on `Organization` yet. Add
-  it in a new migration once that's decided.
+- **Free vs paid features.** Riot's developer policy doesn't allow charging money or giving paid-only
+  access to any part of a product built on its API, so paid vacancy postings or paid profile features
+  (such as "who viewed your profile") aren't allowed as things stand.
 - **Obscurity Esports** was a test org from an old seed script; migration `007_remove_test_org.sql` removes it.
 
 ## Deploying (Google Cloud free VM)
@@ -323,7 +346,7 @@ between requests. The repo is set up for [Render](https://render.com):
 | `RIOT_API_KEY` | set in Render's dashboard; never committed (`.env` is gitignored) |
 | `DB_PATH` | `/var/data/veridium.db`, which must sit on the disk mount or data is lost on redeploy |
 | `SEASONS` | `3` |
-| `SITE_PASSWORD` | puts the whole site behind a browser password prompt. Recommended while Riot ID ownership isn't verified |
+| `SITE_PASSWORD` | puts the whole site behind a browser password prompt. Required while on a Riot development key (Riot only allows those on a private prototype), and recommended while Riot ID ownership isn't verified |
 | `CONTACT_EMAIL` | the address shown on the Privacy Policy and Terms for privacy and account requests |
 | `ADMIN_EMAILS` | your account email(s): Veridium staff, who verify organizations and approve tournament organizers |
 | `BREVO_API_KEY`, `EMAIL_FROM` | email notifications (optional). Create a free Brevo account, verify a sender address under Senders, and create an API key. `EMAIL_FROM` is that sender, e.g. `Veridium <noreply@yourdomain>` |

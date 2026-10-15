@@ -128,7 +128,7 @@ export function buildProfile(input: {
     region: input.region,
     verified: true,
     rank: latest
-      ? { tier: latest.tier, division: latest.division, leaguePoints: latest.leaguePoints, percentile: null }
+      ? { tier: latest.tier, division: latest.division, leaguePoints: latest.leaguePoints }
       : null,
     totalMatches: currentStats.totalMatches,
     rankedMatches: currentStats.rankedMatches,

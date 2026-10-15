@@ -167,9 +167,8 @@ export interface RankSnapshot extends RankEntry {
 
 // ---- API response for the Player Profile UI ----
 
-export interface ProfileRank extends RankEntry {
-  percentile: number | null; // Riot does not expose this; null until we have a source
-}
+/** Riot's own tier, division and LP, passed through unchanged. */
+export type ProfileRank = RankEntry;
 
 export interface RecentMatch {
   matchId: string;

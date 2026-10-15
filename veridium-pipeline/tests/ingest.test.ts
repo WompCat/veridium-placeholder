@@ -42,7 +42,7 @@ describe('ingestPlayer', () => {
     expect(mock.calls).toContain(`https://na1.api.riotgames.com/tft/league/v1/by-puuid/${PUUID}`);
     expect(result.fetchedMatchIds).toHaveLength(20); // first page only
     expect(result.profile.history).toEqual({ complete: false, syncing: true });
-    expect(result.profile.rank).toEqual({ tier: 'DIAMOND', division: 'IV', leaguePoints: 42, percentile: null });
+    expect(result.profile.rank).toEqual({ tier: 'DIAMOND', division: 'IV', leaguePoints: 42 });
 
     await result.history;
     expect(mock.matchCalls()).toHaveLength(35); // every match exactly once

@@ -154,7 +154,7 @@
     <div class="features">
       <div class="feature">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg></div>
-        <h3>Verified Stats</h3><p>Real match data from game APIs, not self-reported. Placements, ranks and history, straight from Riot.</p>
+        <h3>Verified Stats</h3><p>Real match data from game APIs, not self-reported. Placements, ranks and history, straight from Riot's public API.</p>
       </div>
       <div class="feature">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m20 20-5.5-5.5"/><path d="M7.5 12.5c.6-1.5 1.5-2.2 2.5-2.2s1.9.7 2.5 2.2"/><circle cx="10" cy="8" r="1.4"/></svg></div>
@@ -279,7 +279,7 @@
       <div class="top"><span class="avatar" style="color:#fff">${esc(name.charAt(0).toUpperCase())}</span>
         <div><b>${esc(name)} ${VERIFIED}</b><span class="sub" style="color:rgba(255,255,255,.8)">TFT Player · ${esc(top.region.toUpperCase())} · #${esc(tag)}</span></div></div>
       <div class="body">
-        <span class="live">Verified from Riot</span>
+        <span class="live">Live from Riot's API</span>
         <div class="nums">
           <div>Rank<b>${esc(top.rank ? fmtRank(top.rank) : 'Unranked')}</b></div>
           <div>Top-4<b>${top.totalMatches ? pct(top.winRate) : '–'}</b></div>
