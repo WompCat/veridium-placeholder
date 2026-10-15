@@ -82,8 +82,8 @@ read. They're never in the repo.
 ## Before you rely on it
 
 - **Keep the site password on.** Riot only allows a development key on a private prototype, not a site
-  the community can use. Share the password only with people you invite to test, and don't remove it
-  until Riot approves a production key.
+  the community can use. Give the address and password to Riot in your production key application so
+  they can review it, and don't remove the password until Riot approves the key.
 
 - **External IP cost.** Google began charging for external IPv4 addresses in 2024. Check the current
   pricing for your VM's address (the budget alert above will catch it either way). If it's charged,

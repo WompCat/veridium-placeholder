@@ -282,8 +282,9 @@ unchanged. To change the schema, add the next numbered file. Never edit one that
 
 Checked against Riot's "Please Don't / Please Do" developer policy (October 2026):
 
-- **Development key = private prototype.** Keep `SITE_PASSWORD` set and the audience small until
-  Riot approves a production key. Removing the password is a launch, and needs the production key first.
+- **Development key = private prototype.** Keep `SITE_PASSWORD` set until Riot approves a production
+  key, and give the password only to Riot's reviewers (in the production key application, with the site
+  address). Removing the password is a launch, and needs the production key first.
   The GCP `create` command requires a password, and the server warns at startup in production without one.
 - **Key stays server-side.** Only `src/riot/client.ts` sends it, as the `X-Riot-Token` header. It's never in
   the browser or the repository (`.env` is gitignored).
@@ -297,7 +298,7 @@ Checked against Riot's "Please Don't / Please Do" developer policy (October 2026
 - **No Riot logos or look-alike design.** There are no Riot or game logos; game tags are plain text.
   The site says it's an independent site using Riot's public API and isn't endorsed by Riot Games, and
   no copy says Riot verified, approved or partnered with Veridium.
-- **No paid features** (see Free vs paid features below).
+- **No monetization.** Nothing on the site is paid or paid-only (see Free vs paid features below).
 - **One production key per project:** a later, separate product needs its own key.
 
 ### Open decisions
